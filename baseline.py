@@ -9,17 +9,25 @@ data = pickle.load(open('data.pkl', 'rb'))
 answers = [d[0] for d in data]
 scores = np.array([d[1] for d in data])
 
+# TODO:
+# **split camelCase variables
+# separate code keywords (private, void, for, int) from non-keywords
 def process(s):
 	s = s.replace('(', ' ').replace(')', ' ')
 	s = s.replace('\n', ' ').replace('\t', '')
+	# starter code sometimes has a /** 1a **/ with the problem number
+	# unclear if this is removing important comments though
 	if '/**' in s:
 		s = s[s.find('**/') + 3:].strip()
+	# remove other punctuation (e.g. {, =, *)
 	s = re.sub(r'[^\w\s]', '', s)
+	# remove extraneous whitespace
 	s = re.sub(' +', ' ', s)
 	return s
 
 
 def main():
+	# TODO: better train / val / test split
 	indices = range(len(data))
 	random.shuffle(indices)
 	split = int(0.8 * len(indices))
@@ -33,10 +41,10 @@ def main():
 	print "Transforming answers"
 	cv = CountVectorizer()
 	trainX = cv.fit_transform(trainFeatures)
-	vocab = cv.vocabulary_
 	testX = cv.transform(testFeatures)
 	print "Train size:", trainX.shape, "Test size:", testX.shape
 	trainY, testY = scores[trainIndices], scores[testIndices]
+
 	print "Training"
 	model = LinearRegression()
 	model.fit(trainX, trainY)
