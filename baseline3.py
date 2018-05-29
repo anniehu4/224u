@@ -2,10 +2,11 @@ import pickle
 import re
 import random
 import numpy as np
+import time
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.linear_model import LinearRegression
 
-data = pickle.load(open('data.pkl', 'rb'))
+data = pickle.load(open('sampleTests.pkl', 'rb'))
 answers = [d["answer"] for d in data]
 scores = np.array([d["score"] for d in data]).astype(np.float)
 
@@ -32,8 +33,21 @@ def process(s):
 	#print("=======")
 	return s
 
-def CamelCaseProcess(s):
-	return s
+def camel_case_split(identifier):
+    matches = re.finditer('.+?(?:(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|$)', identifier)
+    return [m.group(0) for m in matches]	
+
+# TODO:
+# all words are lowercase
+def camel_case_process(s):
+	words = s.split()
+
+	cc_split_words = []
+	for w in words:
+		cc_split_words += camel_case_split(w)
+
+	joined = " ".join(cc_split_words)
+	return joined
 
 
 def main():
@@ -46,9 +60,9 @@ def main():
 	trainFeatures = []
 	testFeatures = []
 	for i in trainIndices:
-		trainFeatures.append(process(answers[i]))
+		trainFeatures.append(camel_case_process(process(answers[i])))
 	for i in testIndices:
-		testFeatures.append(process(answers[i]))
+		testFeatures.append(camel_case_process(process(answers[i])))
 	print("Transforming answers")
 	cv = CountVectorizer()
 	trainX = cv.fit_transform(trainFeatures)
