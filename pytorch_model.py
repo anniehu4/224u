@@ -13,8 +13,6 @@ class BowDataset(Dataset):
     def __init__(self, x, y, transform=None):
         """
         Args:
-            csv_file (string): Path to the csv file with annotations.
-            root_dir (string): Directory with all the images.
             transform (callable, optional): Optional transform to be applied
                 on a sample.
         """
@@ -50,12 +48,13 @@ def train(args, model, device, train_loader, optimizer, epoch):
     for batch_idx, (data, target) in enumerate(train_loader):
         data, target = data.to(device).float(), target.to(device).float()
         y_true += target.numpy().tolist()
-        optimizer.zero_grad()
+
         output = model(data)
         y_pred += output.cpu().detach().numpy().tolist()
 
         mse = nn.MSELoss()
         loss = mse(output, target)
+        optimizer.zero_grad()
         loss.backward()
         optimizer.step()
         if batch_idx % args.log_interval == 0:
@@ -66,6 +65,7 @@ def train(args, model, device, train_loader, optimizer, epoch):
     epoch_r2 = metrics.r2_score(y_true, y_pred)
     print('Train Epoch: {} Train r2: {}'.format(
                 epoch, epoch_r2))
+    return y_true, y_pred
 
 def test(args, model, device, test_loader):
     model.eval()
@@ -89,6 +89,7 @@ def test(args, model, device, test_loader):
     epoch_r2 = metrics.r2_score(y_true, y_pred)
     print('\nTest set: Average loss: {:.4f}, Test r2: {})\n'.format(
         test_loss, epoch_r2))
+    return y_true, y_pred
 
 def dnn(x_train, y_train, x_test, y_test):
     # Training settings
@@ -99,7 +100,7 @@ def dnn(x_train, y_train, x_test, y_test):
                         help='input batch size for testing (default: 1)')
     parser.add_argument('--epochs', type=int, default=20, metavar='N',
                         help='number of epochs to train (default: 20)')
-    parser.add_argument('--lr', type=float, default=0.01, metavar='LR',
+    parser.add_argument('--lr', type=float, default=0.001, metavar='LR',
                         help='learning rate (default: 0.01)')
     parser.add_argument('--momentum', type=float, default=0.5, metavar='M',
                         help='SGD momentum (default: 0.5)')
@@ -130,8 +131,10 @@ def dnn(x_train, y_train, x_test, y_test):
     optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum)
 
     for epoch in range(1, args.epochs + 1):
-        train(args, model, device, train_loader, optimizer, epoch)
-        test(args, model, device, test_loader)
+        train_true, train_pred = train(args, model, device, train_loader, optimizer, epoch)
+        test_true, test_pred = test(args, model, device, test_loader)
+
+    return (train_true, train_pred, test_true, test_pred)
 
 
 #if __name__ == '__main__':
