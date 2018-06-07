@@ -9,10 +9,11 @@ from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score
 import matplotlib.pyplot as plt
 
-data = pickle.load(open('data.pkl', 'rb'), encoding='latin-1')
+data = pickle.load(open('data.pkl', 'rb'), encoding='latin1')
 answers = [d[0] for d in data]
-scores = np.array([d[2] for d in data])
+scores = np.array([d[2] for d in data]).astype(np.float)
 glove_home = os.path.join('vsmdata', 'glove.6B')
+use_nn = True
 
 def camel_case_split(identifier):
     matches = re.finditer('.+?(?:(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|$)', identifier)
@@ -66,6 +67,7 @@ def main():
 		trainFeatures.append(embed(process(answers[i]), glove_lookup))
 	for i in testIndices:
 		testFeatures.append(embed(process(answers[i]), glove_lookup))
+
 	print("Transforming answers")
 	cv = CountVectorizer()
 	trainX = cv.fit_transform(trainFeatures)
@@ -74,19 +76,22 @@ def main():
 	trainY, testY = scores[trainIndices], scores[testIndices]
 
 	print("Training")
-	model = LinearRegression(fit_intercept=False)
-	model.fit(trainX, trainY)
-	predictions = model.predict(trainX)
-	predictions[predictions > 30] = 30
-	predictions[predictions < 0] = 0
-	print("Train R2: {}".format(r2_score(trainY, predictions)))
+	if use_nn:
+		dnn(trainX.toarray(), trainY.reshape(-1, 1), testX.toarray(), testY.reshape(-1, 1))
+	else:
+		model = LinearRegression(fit_intercept=False)
+		model.fit(trainX, trainY)
+		predictions = model.predict(trainX)
+		predictions[predictions > 30] = 30
+		predictions[predictions < 0] = 0
+		print("Train R2: {}".format(r2_score(trainY, predictions)))
 
-	predictions = model.predict(testX)
-	predictions[predictions > 30] = 30
-	predictions[predictions < 0] = 0
-	print("Test R2: {}".format(r2_score(testY, predictions)))
-	# plt.scatter(testY, predictions)
-	# plt.show()
+		predictions = model.predict(testX)
+		predictions[predictions > 30] = 30
+		predictions[predictions < 0] = 0
+		print("Test R2: {}".format(r2_score(testY, predictions)))
+		plt.scatter(testY, predictions)
+		plt.show()
 
 
 
