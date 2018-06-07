@@ -5,11 +5,12 @@ import numpy as np
 import time
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.linear_model import LinearRegression
+from pytorch_model import *
 
 data = pickle.load(open('sampleTests.pkl', 'rb'))
 answers = [d["answer"] for d in data]
 scores = np.array([d["score"] for d in data]).astype(np.float)
-
+use_nn = True
 
 # TODO:
 # **split camelCase variables
@@ -70,14 +71,18 @@ def main():
 	print("Train size: {} Test size: {}".format(trainX.shape, testX.shape))
 	trainY, testY = scores[trainIndices], scores[testIndices]
 
-	print("Training")
-	model = LinearRegression()
-	model.fit(trainX, trainY)
-	train_r2 = model.score(trainX, trainY)
-	test_r2 = model.score(testX, testY)
-	print("Train R2: {}".format(train_r2))
-	print("Test R2: {}".format(test_r2))
 
+	print("Training")
+	
+	if use_nn:
+		dnn(trainX.toarray(), trainY.reshape(-1, 1), testX.toarray(), testY.reshape(-1, 1))
+	else:
+		model = LinearRegression()
+		model.fit(trainX, trainY)
+		train_r2 = model.score(trainX, trainY)
+		test_r2 = model.score(testX, testY)
+		print("Train R2: {}".format(train_r2))
+		print("Test R2: {}".format(test_r2))
 
 if __name__ == '__main__':
 	main()
