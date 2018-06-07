@@ -7,9 +7,11 @@ from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.linear_model import LinearRegression
 from pytorch_model import *
 
-data = pickle.load(open('sampleTests.pkl', 'rb'))
-answers = [d["answer"] for d in data]
-scores = np.array([d["score"] for d in data]).astype(np.float)
+data = pickle.load(open('data.pkl', 'rb'), encoding='latin1')
+answers = [d[0] for d in data]
+scores = np.array([d[2] for d in data]).astype(np.float)
+#answers = [d["answer"] for d in data]
+#scores = np.array([d["score"] for d in data]).astype(np.float)
 use_nn = True
 
 # TODO:
