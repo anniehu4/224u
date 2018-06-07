@@ -2,34 +2,17 @@ import pickle
 import re
 import random
 import numpy as np
+import os
+import utils
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.linear_model import LinearRegression
+from sklearn.metrics import r2_score
 import matplotlib.pyplot as plt
 
-data = pickle.load(open('data.pkl', 'rb'))
+data = pickle.load(open('data.pkl', 'rb'), encoding='latin-1')
 answers = [d[0] for d in data]
 scores = np.array([d[2] for d in data])
-
-def splitCamelCase(s):
-	words = s.split(' ')
-	new_s = []
-	for i in range(len(words)):
-		w = words[i]
-		new_w = []
-		if not w or w[0].isupper():
-			new_s.append(w)
-			continue
-		start = 0
-		for i in range(1, len(w)):
-			if w[i].isupper():
-				new_w.append(w[start:i].lower())
-				start = i
-		if start > 0:
-			new_w.append(w[start:].lower())
-			new_s.extend(new_w)
-		else:
-			new_s.append(w)
-	return ' '.join(new_s)
+glove_home = os.path.join('vsmdata', 'glove.6B')
 
 def camel_case_split(identifier):
     matches = re.finditer('.+?(?:(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|$)', identifier)
@@ -63,37 +46,47 @@ def process(s):
 	s = camel_case_process(s)
 	return s.lower()
 
+def embed(s, lookup):
+	tokens = [lookup[x] for x in s.split(' ') if x in lookup]
+	return np.array(tokens)
 
 def main():
 	# TODO: better train / val / test split
-	indices = range(len(data))
+	indices = list(range(len(data)))
 	random.seed(1)
 	random.shuffle(indices)
 	split = int(0.8 * len(indices))
 	trainIndices, testIndices = indices[:split], indices[split:]
+
+	glove_lookup = utils.glove2dict(os.path.join(glove_home, 'glove.6B.50d.txt'))
 	trainFeatures = []
 	testFeatures = []
-	print "Processing strings"
+	print("Processing strings")
 	for i in trainIndices:
-		trainFeatures.append(process(answers[i]))
+		trainFeatures.append(embed(process(answers[i]), glove_lookup))
 	for i in testIndices:
-		testFeatures.append(process(answers[i]))
-	print "Transforming answers"
+		testFeatures.append(embed(process(answers[i]), glove_lookup))
+	print("Transforming answers")
 	cv = CountVectorizer()
 	trainX = cv.fit_transform(trainFeatures)
 	testX = cv.transform(testFeatures)
-	print "Train size:", trainX.shape, "Test size:", testX.shape
+	print("Train size: {} Test size: {}".format(trainX.shape, testX.shape))
 	trainY, testY = scores[trainIndices], scores[testIndices]
 
-	print "Training"
+	print("Training")
 	model = LinearRegression(fit_intercept=False)
 	model.fit(trainX, trainY)
-	print "Train R2:", model.score(trainX, trainY)
-	print "Test R2:", model.score(testX, testY)
+	predictions = model.predict(trainX)
+	predictions[predictions > 30] = 30
+	predictions[predictions < 0] = 0
+	print("Train R2: {}".format(r2_score(trainY, predictions)))
 
-	predictions = abs(model.predict(testX))
-	plt.scatter(testY, predictions)
-	plt.show()
+	predictions = model.predict(testX)
+	predictions[predictions > 30] = 30
+	predictions[predictions < 0] = 0
+	print("Test R2: {}".format(r2_score(testY, predictions)))
+	# plt.scatter(testY, predictions)
+	# plt.show()
 
 
 
