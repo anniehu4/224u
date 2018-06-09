@@ -10,13 +10,14 @@ from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score
 from pytorch_model import *
 import matplotlib.pyplot as plt
+import keyword
 
 data = pickle.load(open('data.pkl', 'rb'), encoding='latin1')
 answers = [d[0] for d in data]
 scores = np.array([d[2] for d in data]).astype(np.float)
 glove_home = os.path.join('vsmdata', 'glove.6B')
-use_nn = True
-use_embed = True
+use_nn = False
+use_embed = False
 
 def camel_case_split(identifier):
     matches = re.finditer('.+?(?:(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|$)', identifier)
@@ -54,6 +55,18 @@ def embed(s, lookup):
 	tokens = [lookup[x] for x in s.split(' ') if x in lookup]
 	return np.array(tokens)
 
+def filter_keywords(s):
+	words = []
+	keywords = []
+	count_keywords = 0 # just to sanity check
+	for x in s.split(' '):
+		if keyword.iskeyword(x):
+			keywords.append(x)
+			count_keywords += 1
+		else:
+			words.append(x)
+	return ' '.join(words)
+
 def pad(features, max_len, dim=50):
 	for i, row in enumerate(features):
 		pad_size = max_len - len(row)
@@ -79,12 +92,12 @@ def main():
 	testFeatures = []
 	print("Processing strings")
 	for i in trainIndices:
-		features = process(answers[i])
+		features = filter_keywords(process(answers[i]))
 		if use_embed:
 			features = embed(features, glove_lookup)
 		trainFeatures.append(features)
 	for i in testIndices:
-		features = process(answers[i])
+		features = filter_keywords(process(answers[i]))
 		if use_embed:
 			features = embed(features, glove_lookup)
 		testFeatures.append(features)
