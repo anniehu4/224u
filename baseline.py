@@ -16,7 +16,7 @@ data = pickle.load(open('data.pkl', 'rb'), encoding='latin1')
 answers = [d[0] for d in data]
 scores = np.array([d[2] for d in data]).astype(np.float)
 glove_home = os.path.join('vsmdata', 'glove.6B')
-use_nn = False
+use_nn = True
 use_embed = False
 
 def camel_case_split(identifier):
