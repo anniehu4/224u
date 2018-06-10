@@ -90,6 +90,8 @@ def main():
 	dev_data = pickle.load(open('data/dev.pkl', 'rb'))
 
 	normalize_scores = False
+	use_nn = True
+	use_embed = False
 
 	train_answers, train_scores = prepare_data(train_data, normalize_scores)
 	dev_answers, dev_scores = prepare_data(dev_data, normalize_scores)
@@ -97,8 +99,6 @@ def main():
 
 	print("Preparing glove data...")
 	glove_home = os.path.join('vsmdata', 'glove.6B')
-	use_nn = True
-	use_embed = False
 
 	glove_lookup = utils.glove2dict(os.path.join(glove_home, 'glove.6B.50d.txt'))
 	print(" - done.")
