@@ -4,6 +4,7 @@ import random
 import numpy as np
 import time
 import os
+import sys
 import utils
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.linear_model import LinearRegression
@@ -11,13 +12,6 @@ from sklearn.metrics import r2_score
 from pytorch_model import *
 import matplotlib.pyplot as plt
 import keyword
-
-data = pickle.load(open('data.pkl', 'rb'), encoding='latin1')
-answers = [d[0] for d in data]
-scores = np.array([d[2] for d in data]).astype(np.float)
-glove_home = os.path.join('vsmdata', 'glove.6B')
-use_nn = True
-use_embed = False
 
 def camel_case_split(identifier):
     matches = re.finditer('.+?(?:(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|$)', identifier)
@@ -79,45 +73,67 @@ def pad(features, max_len, dim=50):
 			features[i] = padded.flatten()
 	return np.array(features)
 
+def prepare_data(data, use_normalized):
+	answers = [d['answer'] for d in data]
+	if use_normalized:
+		scores = np.array([d['scoreNormalized'] for d in data]).astype(np.float)
+	else:
+		scores = np.array([d['score'] for d in data]).astype(np.float)
+
+	return (answers, scores)
+
+
+
 def main():
-	# TODO: better train / val / test split
-	indices = list(range(len(data)))
-	random.seed(1)
-	random.shuffle(indices)
-	split = int(0.8 * len(indices))
-	trainIndices, testIndices = indices[:split], indices[split:]
+	print("Loading training data...")
+	train_data = pickle.load(open('data/train.pkl', 'rb'))
+	dev_data = pickle.load(open('data/dev.pkl', 'rb'))
+
+	normalize_scores = False
+
+	train_answers, train_scores = prepare_data(train_data, normalize_scores)
+	dev_answers, dev_scores = prepare_data(dev_data, normalize_scores)
+	print(" - done.")
+
+	print("Preparing glove data...")
+	glove_home = os.path.join('vsmdata', 'glove.6B')
+	use_nn = True
+	use_embed = False
 
 	glove_lookup = utils.glove2dict(os.path.join(glove_home, 'glove.6B.50d.txt'))
+	print(" - done.")
 	trainFeatures = []
-	testFeatures = []
+	devFeatures = []
+
 	print("Processing strings")
-	for i in trainIndices:
-		features = filter_keywords(process(answers[i]))
+	for train_answer in train_answers:
+		features = filter_keywords(process(train_answer))
 		if use_embed:
 			features = embed(features, glove_lookup)
 		trainFeatures.append(features)
-	for i in testIndices:
-		features = filter_keywords(process(answers[i]))
+	for dev_answer in dev_answers:
+		features = filter_keywords(process(dev_answer))
 		if use_embed:
 			features = embed(features, glove_lookup)
-		testFeatures.append(features)
+		devFeatures.append(features)
+	print(" - done.")
 
 	print("Transforming answers")
 	# maximum length of answer in dataset is 652
 	max_len = 500
 	if use_embed:
 		trainX = pad(trainFeatures, max_len)
-		testX = pad(testFeatures, max_len)
+		devX = pad(devFeatures, max_len)
 	else:
 		cv = CountVectorizer()
 		trainX = cv.fit_transform(trainFeatures).toarray()
-		testX = cv.transform(testFeatures).toarray()
-	print("Train size: {} Test size: {}".format(trainX.shape, testX.shape))
-	trainY, testY = scores[trainIndices], scores[testIndices]
+		devX = cv.transform(devFeatures).toarray()
+	print("Train size: {} Dev size: {}".format(trainX.shape, devX.shape))
+	trainY, devY = train_scores, dev_scores
 
 	print("Training")
 	if use_nn:
-		train_true, train_pred, test_true, test_pred = dnn(trainX, trainY.reshape(-1, 1), testX, testY.reshape(-1, 1))
+		train_true, train_pred, dev_true, dev_pred = dnn(trainX, trainY.reshape(-1, 1), devX, devY.reshape(-1, 1))
 	else:
 		model = LinearRegression(fit_intercept=False)
 		model.fit(trainX, trainY)
@@ -126,12 +142,12 @@ def main():
 		predictions[predictions < 0] = 0
 		print("Train R2: {}".format(r2_score(trainY, predictions)))
 
-		predictions = model.predict(testX)
+		predictions = model.predict(devX)
 		predictions[predictions > 30] = 30
 		predictions[predictions < 0] = 0
-		print("Test R2: {}".format(r2_score(testY, predictions)))
+		print("Dev R2: {}".format(r2_score(devY, predictions)))
 	
-	plt.scatter(test_true, test_pred)
+	plt.scatter(dev_true, dev_pred)
 	plt.show()
 
 
