@@ -72,7 +72,11 @@ def glove2dict(src_filename):
 
     """
     data = {}
+<<<<<<< HEAD
     with open(src_filename,  encoding='utf8') as f:
+=======
+    with open(src_filename) as f:
+>>>>>>> 45482d17978162b3557efe36e585c89ea8f014fd
         while True:
             try:
                 line = next(f)

@@ -37,9 +37,30 @@ class Net(nn.Module):
 
     def forward(self, x):
         x = F.relu(self.fc1(x))
-        x = F.dropout(x, training=self.training)
+        x = F.dropout(x, p=0.2, training=self.training)
         x = self.fc2(x)
         return x
+
+class RNN(nn.Module):
+    def __init__(self, input_size, hidden_size, num_layers):
+        super(RNN, self).__init__()
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
+        # "nn.Linear" performs the last step of prediction, where it maps the hidden layer to # classes
+        self.fc = nn.Linear(hidden_size, 1)
+    
+    def forward(self, x):
+        # Set initial hidden and cell states 
+        h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size) 
+        c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size)
+        
+        # Forward propagate LSTM
+        out, _ = self.lstm(x.unsqueeze(2), (h0, c0))  # out: tensor of shape (batch_size, seq_length, hidden_size)
+        
+        # Decode the hidden state of the last time step
+        out = self.fc(out[:, -1, :])
+        return out
 
 def train(args, model, device, train_loader, optimizer, epoch):
     model.train()
@@ -91,6 +112,13 @@ def test(args, model, device, test_loader):
         test_loss, epoch_r2))
     return y_true, y_pred
 
+def get_optimizer(optimizer_type, model):
+    if optimizer_type == 'adam':
+        optimizer = optim.Adam(model.parameters(), lr=0.01)
+    else:
+        optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum)
+    return optimizer
+
 def dnn(x_train, y_train, x_test, y_test):
     # Training settings
     parser = argparse.ArgumentParser(description='PyTorch MNIST Example')
@@ -98,17 +126,17 @@ def dnn(x_train, y_train, x_test, y_test):
                         help='input batch size for training (default: 64)')
     parser.add_argument('--test-batch-size', type=int, default=1, metavar='N',
                         help='input batch size for testing (default: 1)')
-    parser.add_argument('--epochs', type=int, default=20, metavar='N',
+    parser.add_argument('--epochs', type=int, default=10, metavar='N',
                         help='number of epochs to train (default: 20)')
     parser.add_argument('--lr', type=float, default=0.001, metavar='LR',
-                        help='learning rate (default: 0.01)')
+                        help='learning rate (default: 0.001)')
     parser.add_argument('--momentum', type=float, default=0.5, metavar='M',
                         help='SGD momentum (default: 0.5)')
     parser.add_argument('--no-cuda', action='store_true', default=False,
                         help='disables CUDA training')
     parser.add_argument('--seed', type=int, default=1, metavar='S',
                         help='random seed (default: 1)')
-    parser.add_argument('--log-interval', type=int, default=50, metavar='N',
+    parser.add_argument('--log-interval', type=int, default=10, metavar='N',
                         help='how many batches to wait before logging training status')
     args = parser.parse_args()
     use_cuda = not args.no_cuda and torch.cuda.is_available()
@@ -126,9 +154,18 @@ def dnn(x_train, y_train, x_test, y_test):
         BowDataset(x_test, y_test),
         batch_size=args.test_batch_size, shuffle=True, **kwargs)
 
+    rnn = True
+    optimizer_type = 'adam'
+
     n_features = x_train.shape[1]
-    model = Net(n_features).to(device)
-    optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum)
+    hidden_size = 20
+
+    if rnn:
+        model = RNN(1, hidden_size, 1)
+    else:
+        model = Net(n_features).to(device)
+
+    optimizer = get_optimizer(optimizer_type, model)
 
     for epoch in range(1, args.epochs + 1):
         train_true, train_pred = train(args, model, device, train_loader, optimizer, epoch)
