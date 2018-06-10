@@ -3,14 +3,10 @@ import pickle
 import argparse
 import re
 from collections import Counter
-from gensim import models
 from utils import process
 
 data_path = 'data.pkl'
 vocab_output_path = 'vocab.pkl'
-embedding_output_path = 'embeddings.bin'
-
-IGNORE = ['\\mbox', '\\left', '\\right', '\\hbox', '\\vtop']
 
 class Vocabulary(object):
     """Simple vocabulary wrapper."""

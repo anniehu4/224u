@@ -6,7 +6,9 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 from torchvision import datasets, transforms
+from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence
 from sklearn import metrics
+from utils import pad
 
 class BowDataset(Dataset):
 
@@ -28,6 +30,35 @@ class BowDataset(Dataset):
         sample = (self.x[idx], 
             self.y[idx])
         return sample
+
+def collate_fn(data):
+    """Creates mini-batch tensors from the list of tuples (features, score).
+
+    We should build custom collate_fn rather than using default collate_fn,
+    because padding is not supported in default.
+    Args:
+        data: list of tuple (image, caption).
+            - answer: torch tensor of shape (?); variable length
+            - score: torch tensor of shape (1,)
+    Returns:
+        answers: torch tensor of shape (batch_size, padded_length).
+        scores: torch tensor of shape (batch_size, 1).
+        lengths: list; valid length for each padded answer.
+    """
+    # Sort a data list by caption length (descending order).
+    data.sort(key=lambda x: len(x[0]), reverse=True)
+    answers, scores = zip(*data)
+
+    # Merge scores (from tuple of 1D tensor to 2D tensor).
+    scores = torch.stack(scores, 0)
+
+    # Merge answers (from tuple of 2D tensor to 3D tensor).
+    lengths = [len(answer) for answer in answers]
+    padded = torch.zeros(len(answers), max(lengths)).long()
+    for i, answer in enumerate(answers):
+        end = lengths[i]
+        padded[i, :end] = answer[:end]
+    return padded, scores, lengths
 
 class Net(nn.Module):
     def __init__(self, n_features):
@@ -56,7 +87,7 @@ class RNN(nn.Module):
         c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size)
         
         # Forward propagate LSTM
-        out, _ = self.lstm(x.unsqueeze(2), (h0, c0))  # out: tensor of shape (batch_size, seq_length, hidden_size)
+        out, _ = self.lstm(x, (h0, c0))  # out: tensor of shape (batch_size, seq_length, hidden_size)
         
         # Decode the hidden state of the last time step
         out = self.fc(out[:, -1, :])
@@ -122,9 +153,9 @@ def get_optimizer(optimizer_type, model):
 def dnn(x_train, y_train, x_test, y_test):
     # Training settings
     parser = argparse.ArgumentParser(description='PyTorch MNIST Example')
-    parser.add_argument('--batch-size', type=int, default=64, metavar='N',
+    parser.add_argument('--batch-size', type=int, default=1, metavar='N',
                         help='input batch size for training (default: 64)')
-    parser.add_argument('--test-batch-size', type=int, default=1, metavar='N',
+    parser.add_argument('--test-batch-size', type=int, default=10, metavar='N',
                         help='input batch size for testing (default: 1)')
     parser.add_argument('--epochs', type=int, default=10, metavar='N',
                         help='number of epochs to train (default: 20)')
@@ -146,22 +177,32 @@ def dnn(x_train, y_train, x_test, y_test):
     device = torch.device("cuda" if use_cuda else "cpu")
 
     kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
+
+    if rnn:
+        x_train, train_lengths = pad(x_train, max_len=500, dim=1)
+        x_test, test_lengths = pad(x_test, max_len=500, dim=1)
+        x_train = x_train.unsqueeze(2)
+        x_test = x_test.unsqueeze(2)
+
     train_loader = DataLoader(
         BowDataset(x_train, y_train),
-        batch_size=args.batch_size, shuffle=True, **kwargs)
+        batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn, **kwargs)
     
     test_loader = DataLoader(
         BowDataset(x_test, y_test),
-        batch_size=args.test_batch_size, shuffle=True, **kwargs)
+        batch_size=args.test_batch_size, shuffle=True, collate_fn=collate_fn, **kwargs)
 
     rnn = True
     optimizer_type = 'adam'
 
     n_features = x_train.shape[1]
+    embed_size = 50
     hidden_size = 20
 
     if rnn:
-        model = RNN(1, hidden_size, 1)
+        # x_train = x_train.reshape((x_train.shape[0], -1, embed_size))
+        # x_test = x_test.reshape((x_test.shape[0], -1, embed_size))
+        model = RNN(1, hidden_size, x_train.shape[1]).to(device)
     else:
         model = Net(n_features).to(device)
 

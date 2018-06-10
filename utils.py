@@ -57,7 +57,9 @@ def filter_keywords(s):
     return ' '.join(words)
 
 def pad(features, max_len, dim=50):
+    lengths = []
     for i, row in enumerate(features):
+        lenghts.append(len(row))
         pad_size = max_len - len(row)
         if pad_size < 0:
             features[i] = row[:max_len, :].flatten()
@@ -66,7 +68,7 @@ def pad(features, max_len, dim=50):
         else:
             padded = np.pad(row, ((0, pad_size), (0, 0)), 'constant')
             features[i] = padded.flatten()
-    return np.array(features)
+    return np.array(features), lengths
 
 def build(src_filename, delimiter=',', header=True, quoting=csv.QUOTE_MINIMAL):
     """Reads in matrices from CSV or space-delimited files.
@@ -130,7 +132,7 @@ def glove2dict(src_filename):
 
     """
     data = {}
-    with open(src_filename) as f:
+    with open(src_filename, encoding='utf8') as f:
         while True:
             try:
                 line = next(f)

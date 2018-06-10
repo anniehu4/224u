@@ -1,5 +1,4 @@
 import pickle
-import re
 import random
 import numpy as np
 import time
@@ -11,73 +10,17 @@ from sklearn.metrics import r2_score
 from pytorch_model import *
 import matplotlib.pyplot as plt
 import keyword
+from utils import *
+from vocab import Vocabulary
 
-data = pickle.load(open('data.pkl', 'rb'), encoding='latin1')
-answers = [d[0] for d in data]
-scores = np.array([d[2] for d in data]).astype(np.float)
+vocab = pickle.load(open('vocab.pkl', 'rb'))
+data = pickle.load(open('data.pkl', 'rb'))
+answers = [d['answer'] for d in data]
+scores = np.array([d['score'] for d in data]).astype(np.float)
 glove_home = os.path.join('vsmdata', 'glove.6B')
 use_nn = True
-use_embed = False
-
-def camel_case_split(identifier):
-    matches = re.finditer('.+?(?:(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|$)', identifier)
-    return [m.group(0) for m in matches]	
-
-def camel_case_process(s):
-	words = s.split()
-
-	cc_split_words = []
-	for w in words:
-		cc_split_words += camel_case_split(w)
-
-	joined = " ".join(cc_split_words)
-	return joined
-
-# TODO:
-# separate code keywords (private, void, for, int) from non-keywords
-def process(s):
-	s = s.replace('(', ' ').replace(')', ' ')
-	s = s.replace('\n', ' ').replace('\t', '')
-	# starter code sometimes has a /** 1a **/ with the problem number
-	# unclear if this is removing important comments though
-	if '/**' in s:
-		s = s[s.find('**/') + 3:].strip()
-	# remove other punctuation (e.g. {, =, *)
-	s = re.sub(r'[^\w\s]', '', s)
-	# handle snake case
-	s = s.replace('_', ' ')
-	# remove extraneous whitespace
-	s = re.sub(' +', ' ', s)
-	s = camel_case_process(s)
-	return s.lower()
-
-def embed(s, lookup):
-	tokens = [lookup[x] for x in s.split(' ') if x in lookup]
-	return np.array(tokens)
-
-def filter_keywords(s):
-	words = []
-	keywords = []
-	count_keywords = 0 # just to sanity check
-	for x in s.split(' '):
-		if keyword.iskeyword(x):
-			keywords.append(x)
-			count_keywords += 1
-		else:
-			words.append(x)
-	return ' '.join(words)
-
-def pad(features, max_len, dim=50):
-	for i, row in enumerate(features):
-		pad_size = max_len - len(row)
-		if pad_size < 0:
-			features[i] = row[:max_len, :].flatten()
-		elif pad_size == max_len: #strange edge case, will debug later
-			features[i] = np.zeros(max_len * dim)
-		else:
-			padded = np.pad(row, ((0, pad_size), (0, 0)), 'constant')
-			features[i] = padded.flatten()
-	return np.array(features)
+use_rnn = True
+use_embed = True
 
 def main():
 	# TODO: better train / val / test split
@@ -87,27 +30,31 @@ def main():
 	split = int(0.8 * len(indices))
 	trainIndices, testIndices = indices[:split], indices[split:]
 
-	glove_lookup = utils.glove2dict(os.path.join(glove_home, 'glove.6B.50d.txt'))
+	glove_lookup = glove2dict(os.path.join(glove_home, 'glove.6B.50d.txt'))
 	trainFeatures = []
 	testFeatures = []
 	print("Processing strings")
 	for i in trainIndices:
 		features = filter_keywords(process(answers[i]))
-		if use_embed:
+		if use_embed: # TODO: make embedding compatible with rnn
 			features = embed(features, glove_lookup)
+		elif use_rnn:
+			features = [vocab(x) for x in features.split(' ')]
 		trainFeatures.append(features)
 	for i in testIndices:
 		features = filter_keywords(process(answers[i]))
 		if use_embed:
 			features = embed(features, glove_lookup)
+		elif use_rnn:
+			features = [vocab(x) for x in features.split(' ')]
 		testFeatures.append(features)
 
 	print("Transforming answers")
 	# maximum length of answer in dataset is 652
 	max_len = 500
 	if use_embed:
-		trainX = pad(trainFeatures, max_len)
-		testX = pad(testFeatures, max_len)
+		trainX, lengths = pad(trainFeatures, max_len)
+		testX, lengths = pad(testFeatures, max_len)
 	else:
 		cv = CountVectorizer()
 		trainX = cv.fit_transform(trainFeatures).toarray()
