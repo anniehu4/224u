@@ -13,9 +13,7 @@ print("Parsed {} student answers.".format(len(data)))
 print("- done.")
 
 def main():
-	# TODO: better train / val / test split
 	random.shuffle(data)
-
 
 	train_split = int(0.8 * len(data))
 	dev_split = int(0.9 * len(data))
