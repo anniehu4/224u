@@ -1,14 +1,72 @@
 __author__ = "Christopher Potts"
 __version__ = "CS224u, Stanford, Spring 2016"
 
-
+import re
 import sys
 import csv
 import random
 import numpy as np
 from sklearn.metrics import f1_score
 
+def camel_case_split(identifier):
+    matches = re.finditer('.+?(?:(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|$)', identifier)
+    return [m.group(0) for m in matches]    
 
+def camel_case_process(s):
+    words = s.split()
+
+    cc_split_words = []
+    for w in words:
+        cc_split_words += camel_case_split(w)
+
+    joined = " ".join(cc_split_words)
+    return joined
+
+# TODO:
+# separate code keywords (private, void, for, int) from non-keywords
+def process(s):
+    s = s.replace('(', ' ').replace(')', ' ')
+    s = s.replace('\n', ' ').replace('\t', '')
+    # starter code sometimes has a /** 1a **/ with the problem number
+    # unclear if this is removing important comments though
+    if '/**' in s:
+        s = s[s.find('**/') + 3:].strip()
+    # remove other punctuation (e.g. {, =, *)
+    s = re.sub(r'[^\w\s]', '', s)
+    # handle snake case
+    s = s.replace('_', ' ')
+    # remove extraneous whitespace
+    s = re.sub(' +', ' ', s)
+    s = camel_case_process(s)
+    return s.lower()
+
+def embed(s, lookup):
+    tokens = [lookup[x] for x in s.split(' ') if x in lookup]
+    return np.array(tokens)
+
+def filter_keywords(s):
+    words = []
+    keywords = []
+    count_keywords = 0 # just to sanity check
+    for x in s.split(' '):
+        if keyword.iskeyword(x):
+            keywords.append(x)
+            count_keywords += 1
+        else:
+            words.append(x)
+    return ' '.join(words)
+
+def pad(features, max_len, dim=50):
+    for i, row in enumerate(features):
+        pad_size = max_len - len(row)
+        if pad_size < 0:
+            features[i] = row[:max_len, :].flatten()
+        elif pad_size == max_len: #strange edge case, will debug later
+            features[i] = np.zeros(max_len * dim)
+        else:
+            padded = np.pad(row, ((0, pad_size), (0, 0)), 'constant')
+            features[i] = padded.flatten()
+    return np.array(features)
 
 def build(src_filename, delimiter=',', header=True, quoting=csv.QUOTE_MINIMAL):
     """Reads in matrices from CSV or space-delimited files.
