@@ -1,1 +1,5 @@
 *.pkl
+vsmdata/*
+*.ipynb
+*.pyc
+.DS_Store

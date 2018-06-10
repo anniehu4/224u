@@ -5,8 +5,8 @@ import re
 from collections import Counter
 from utils import process
 
-data_path = 'data.pkl'
-vocab_output_path = 'vocab.pkl'
+data_path = 'data/data.pkl'
+vocab_output_path = 'data/vocab.pkl'
 
 class Vocabulary(object):
     """Simple vocabulary wrapper."""

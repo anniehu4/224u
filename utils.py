@@ -1,12 +1,19 @@
-__author__ = "Christopher Potts"
-__version__ = "CS224u, Stanford, Spring 2016"
-
 import re
 import sys
 import csv
 import random
 import numpy as np
+import keyword
 from sklearn.metrics import f1_score
+
+def prepare_data(data, use_normalized):
+    answers = [d['answer'] for d in data]
+    if use_normalized:
+        scores = np.array([d['scoreNormalized'] for d in data]).astype(np.float)
+    else:
+        scores = np.array([d['score'] for d in data]).astype(np.float)
+
+    return (answers, scores)
 
 def camel_case_split(identifier):
     matches = re.finditer('.+?(?:(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|$)', identifier)
@@ -22,8 +29,6 @@ def camel_case_process(s):
     joined = " ".join(cc_split_words)
     return joined
 
-# TODO:
-# separate code keywords (private, void, for, int) from non-keywords
 def process(s):
     s = s.replace('(', ' ').replace(')', ' ')
     s = s.replace('\n', ' ').replace('\t', '')
@@ -44,6 +49,7 @@ def embed(s, lookup):
     tokens = [lookup[x] for x in s.split(' ') if x in lookup]
     return np.array(tokens)
 
+# separates code keywords (private, void, for, int) from non-keywords
 def filter_keywords(s):
     words = []
     keywords = []
@@ -57,9 +63,7 @@ def filter_keywords(s):
     return ' '.join(words)
 
 def pad(features, max_len, dim=50):
-    lengths = []
     for i, row in enumerate(features):
-        lenghts.append(len(row))
         pad_size = max_len - len(row)
         if pad_size < 0:
             features[i] = row[:max_len, :].flatten()
@@ -68,7 +72,9 @@ def pad(features, max_len, dim=50):
         else:
             padded = np.pad(row, ((0, pad_size), (0, 0)), 'constant')
             features[i] = padded.flatten()
-    return np.array(features), lengths
+    return np.array(features)
+
+"""Code after this point taken from CS224U course examples"""
 
 def build(src_filename, delimiter=',', header=True, quoting=csv.QUOTE_MINIMAL):
     """Reads in matrices from CSV or space-delimited files.

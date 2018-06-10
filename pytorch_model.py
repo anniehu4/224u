@@ -1,5 +1,6 @@
 from __future__ import print_function
 import argparse
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -8,57 +9,27 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision import datasets, transforms
 from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence
 from sklearn import metrics
+from data_loader import *
 from utils import pad
 
-class BowDataset(Dataset):
-
-    def __init__(self, x, y, transform=None):
-        """
-        Args:
-            transform (callable, optional): Optional transform to be applied
-                on a sample.
-        """
-        self.x = x
-        self.y = y
-        self.transform = transform
-
-    def __len__(self):
-        return self.x.shape[0]
-
-    def __getitem__(self, idx):
-        #sample = {'x': self.x[idx], 'y': self.y[idx]}
-        sample = (self.x[idx], 
-            self.y[idx])
-        return sample
-
-def collate_fn(data):
-    """Creates mini-batch tensors from the list of tuples (features, score).
-
-    We should build custom collate_fn rather than using default collate_fn,
-    because padding is not supported in default.
-    Args:
-        data: list of tuple (image, caption).
-            - answer: torch tensor of shape (?); variable length
-            - score: torch tensor of shape (1,)
-    Returns:
-        answers: torch tensor of shape (batch_size, padded_length).
-        scores: torch tensor of shape (batch_size, 1).
-        lengths: list; valid length for each padded answer.
-    """
-    # Sort a data list by caption length (descending order).
-    data.sort(key=lambda x: len(x[0]), reverse=True)
-    answers, scores = zip(*data)
-
-    # Merge scores (from tuple of 1D tensor to 2D tensor).
-    scores = torch.stack(scores, 0)
-
-    # Merge answers (from tuple of 2D tensor to 3D tensor).
-    lengths = [len(answer) for answer in answers]
-    padded = torch.zeros(len(answers), max(lengths)).long()
-    for i, answer in enumerate(answers):
-        end = lengths[i]
-        padded[i, :end] = answer[:end]
-    return padded, scores, lengths
+parser = argparse.ArgumentParser()
+parser.add_argument('--batch-size', type=int, default=32, metavar='N',
+                    help='input batch size for training (default: 64)')
+parser.add_argument('--test-batch-size', type=int, default=10, metavar='N',
+                    help='input batch size for testing (default: 1)')
+parser.add_argument('--epochs', type=int, default=10, metavar='N',
+                    help='number of epochs to train (default: 20)')
+parser.add_argument('--lr', type=float, default=0.001, metavar='LR',
+                    help='learning rate (default: 0.001)')
+parser.add_argument('--momentum', type=float, default=0.5, metavar='M',
+                    help='SGD momentum (default: 0.5)')
+parser.add_argument('--no-cuda', action='store_true', default=False,
+                    help='disables CUDA training')
+parser.add_argument('--seed', type=int, default=1, metavar='S',
+                    help='random seed (default: 1)')
+parser.add_argument('--log-interval', type=int, default=50, metavar='N',
+                    help='how many batches to wait before logging training status')
+args = parser.parse_args()
 
 class Net(nn.Module):
     def __init__(self, n_features):
@@ -78,30 +49,30 @@ class RNN(nn.Module):
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
-        # "nn.Linear" performs the last step of prediction, where it maps the hidden layer to # classes
         self.fc = nn.Linear(hidden_size, 1)
     
-    def forward(self, x):
+    def forward(self, x, lengths):
         # Set initial hidden and cell states 
         h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size) 
         c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size)
+        packed = pack_padded_sequence(x.unsqueeze(2), lengths, batch_first=True)
         
         # Forward propagate LSTM
-        out, _ = self.lstm(x, (h0, c0))  # out: tensor of shape (batch_size, seq_length, hidden_size)
-        
+        packed_hidden, _ = self.lstm(packed, (h0, c0))
+        hidden, _ = pad_packed_sequence(packed_hidden, batch_first=True)
         # Decode the hidden state of the last time step
-        out = self.fc(out[:, -1, :])
+        out = self.fc(hidden[np.arange(x.size(0)), lengths, :])
         return out
 
 def train(args, model, device, train_loader, optimizer, epoch):
     model.train()
     y_true = []
     y_pred = []
-    for batch_idx, (data, target) in enumerate(train_loader):
+    for batch_idx, (data, target, lengths) in enumerate(train_loader):
         data, target = data.to(device).float(), target.to(device).float()
         y_true += target.numpy().tolist()
 
-        output = model(data)
+        output = model(data, lengths)
         y_pred += output.cpu().detach().numpy().tolist()
 
         mse = nn.MSELoss()
@@ -125,10 +96,10 @@ def test(args, model, device, test_loader):
     y_pred = []
     test_loss = 0
     with torch.no_grad():
-        for data, target in test_loader:
+        for data, target, lengths in test_loader:
             data, target = data.to(device).float(), target.to(device).float()
             y_true += target.numpy().tolist()
-            output = model(data)
+            output = model(data, lengths)
             y_pred += output.cpu().detach().numpy().tolist()
 
             mse = nn.MSELoss()
@@ -145,31 +116,13 @@ def test(args, model, device, test_loader):
 
 def get_optimizer(optimizer_type, model):
     if optimizer_type == 'adam':
-        optimizer = optim.Adam(model.parameters(), lr=0.01)
+        optimizer = optim.Adam(model.parameters(), lr=0.001)
     else:
         optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum)
     return optimizer
 
-def dnn(x_train, y_train, x_test, y_test):
+def basic_nn(x_train, y_train, x_test, y_test):
     # Training settings
-    parser = argparse.ArgumentParser(description='PyTorch MNIST Example')
-    parser.add_argument('--batch-size', type=int, default=1, metavar='N',
-                        help='input batch size for training (default: 64)')
-    parser.add_argument('--test-batch-size', type=int, default=10, metavar='N',
-                        help='input batch size for testing (default: 1)')
-    parser.add_argument('--epochs', type=int, default=10, metavar='N',
-                        help='number of epochs to train (default: 20)')
-    parser.add_argument('--lr', type=float, default=0.001, metavar='LR',
-                        help='learning rate (default: 0.001)')
-    parser.add_argument('--momentum', type=float, default=0.5, metavar='M',
-                        help='SGD momentum (default: 0.5)')
-    parser.add_argument('--no-cuda', action='store_true', default=False,
-                        help='disables CUDA training')
-    parser.add_argument('--seed', type=int, default=1, metavar='S',
-                        help='random seed (default: 1)')
-    parser.add_argument('--log-interval', type=int, default=10, metavar='N',
-                        help='how many batches to wait before logging training status')
-    args = parser.parse_args()
     use_cuda = not args.no_cuda and torch.cuda.is_available()
 
     torch.manual_seed(args.seed)
@@ -178,34 +131,19 @@ def dnn(x_train, y_train, x_test, y_test):
 
     kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
 
-    if rnn:
-        x_train, train_lengths = pad(x_train, max_len=500, dim=1)
-        x_test, test_lengths = pad(x_test, max_len=500, dim=1)
-        x_train = x_train.unsqueeze(2)
-        x_test = x_test.unsqueeze(2)
-
     train_loader = DataLoader(
         BowDataset(x_train, y_train),
-        batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn, **kwargs)
+        batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn)
     
     test_loader = DataLoader(
         BowDataset(x_test, y_test),
-        batch_size=args.test_batch_size, shuffle=True, collate_fn=collate_fn, **kwargs)
+        batch_size=args.test_batch_size, shuffle=True, collate_fn=collate_fn)
 
-    rnn = True
-    optimizer_type = 'adam'
+    optimizer_type = 'sgd'
 
     n_features = x_train.shape[1]
-    embed_size = 50
-    hidden_size = 20
 
-    if rnn:
-        # x_train = x_train.reshape((x_train.shape[0], -1, embed_size))
-        # x_test = x_test.reshape((x_test.shape[0], -1, embed_size))
-        model = RNN(1, hidden_size, x_train.shape[1]).to(device)
-    else:
-        model = Net(n_features).to(device)
-
+    model = Net(n_features).to(device)
     optimizer = get_optimizer(optimizer_type, model)
 
     for epoch in range(1, args.epochs + 1):
@@ -215,5 +153,39 @@ def dnn(x_train, y_train, x_test, y_test):
     return (train_true, train_pred, test_true, test_pred)
 
 
-#if __name__ == '__main__':
-#    main()
+def rnn(x_train, y_train, x_test, y_test):
+    use_cuda = not args.no_cuda and torch.cuda.is_available()
+
+    torch.manual_seed(args.seed)
+
+    device = torch.device("cuda" if use_cuda else "cpu")
+
+    kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
+
+    # x_train, train_lengths = pad(x_train, max_len=500, dim=1)
+    # x_test, test_lengths = pad(x_test, max_len=500, dim=1)
+
+    train_loader = DataLoader(
+        BowDataset(x_train, y_train),
+        batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn, **kwargs)
+    
+    test_loader = DataLoader(
+        BowDataset(x_test, y_test),
+        batch_size=args.test_batch_size, shuffle=True, collate_fn=collate_fn, **kwargs)
+
+    optimizer_type = 'sgd'
+
+    embed_size = 50
+    hidden_size = 20
+
+    # x_train = x_train.reshape((x_train.shape[0], -1, embed_size))
+    # x_test = x_test.reshape((x_test.shape[0], -1, embed_size))
+    model = RNN(1, hidden_size, 1).to(device)
+
+    optimizer = get_optimizer(optimizer_type, model)
+
+    for epoch in range(1, args.epochs + 1):
+        train_true, train_pred = train(args, model, device, train_loader, optimizer, epoch)
+        test_true, test_pred = test(args, model, device, test_loader)
+
+    return (train_true, train_pred, test_true, test_pred)
