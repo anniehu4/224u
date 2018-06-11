@@ -45,8 +45,17 @@ def process(s):
     s = camel_case_process(s)
     return s.lower()
 
-def embed(s, lookup):
-    tokens = [lookup[x] for x in s.split(' ') if x in lookup]
+def embed(s, lookup, dim=50, bow=True, collate=False):
+    s = s.split(' ')
+    if bow:
+        s = set(s) # bag of words
+    if collate:
+        tokens = np.zeros(dim)
+        for x in s:
+            if x in lookup:
+                tokens += lookup[x]
+    else:
+        tokens = [lookup[x] for x in s if x in lookup]
     return np.array(tokens)
 
 # separates code keywords (private, void, for, int) from non-keywords

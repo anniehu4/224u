@@ -13,11 +13,11 @@ from data_loader import *
 from utils import pad
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--batch-size', type=int, default=32, metavar='N',
+parser.add_argument('--batch-size', type=int, default=64, metavar='N',
                     help='input batch size for training (default: 64)')
 parser.add_argument('--test-batch-size', type=int, default=10, metavar='N',
                     help='input batch size for testing (default: 1)')
-parser.add_argument('--epochs', type=int, default=10, metavar='N',
+parser.add_argument('--epochs', type=int, default=20, metavar='N',
                     help='number of epochs to train (default: 20)')
 parser.add_argument('--lr', type=float, default=0.001, metavar='LR',
                     help='learning rate (default: 0.001)')
@@ -34,12 +34,12 @@ args = parser.parse_args()
 class Net(nn.Module):
     def __init__(self, n_features):
         super(Net, self).__init__()
-        self.fc1 = nn.Linear(n_features, 200)
-        self.fc2 = nn.Linear(200, 1)
+        self.fc1 = nn.Linear(n_features, 100)
+        self.fc2 = nn.Linear(100, 1)
 
-    def forward(self, x):
+    def forward(self, x, lengths=None):
         x = F.relu(self.fc1(x))
-        x = F.dropout(x, p=0.2, training=self.training)
+        # x = F.dropout(x, p=0.2, training=self.training)
         x = self.fc2(x)
         return x
 
@@ -47,21 +47,31 @@ class RNN(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers):
         super(RNN, self).__init__()
         self.hidden_size = hidden_size
+        self.input_size = input_size
         self.num_layers = num_layers
         self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
+        # self.fc1 = nn.Linear()
         self.fc = nn.Linear(hidden_size, 1)
     
     def forward(self, x, lengths):
         # Set initial hidden and cell states 
         h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size) 
         c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size)
-        packed = pack_padded_sequence(x.unsqueeze(2), lengths, batch_first=True)
+        if self.input_size == 1:
+            packed = pack_padded_sequence(x.unsqueeze(2), lengths, batch_first=True)
+        else:
+            packed = x.unsqueeze(1)
         
         # Forward propagate LSTM
-        packed_hidden, _ = self.lstm(packed, (h0, c0))
-        hidden, _ = pad_packed_sequence(packed_hidden, batch_first=True)
+        hidden, _ = self.lstm(packed, (h0, c0))
+        if self.input_size == 1:
+            hidden, _ = pad_packed_sequence(hidden, batch_first=True)
+            print(hidden.data.shape)
+            last_hidden = hidden[np.arange(x.size(0)), lengths, :]
+        else:
+            last_hidden = hidden[:, -1, :]
         # Decode the hidden state of the last time step
-        out = self.fc(hidden[np.arange(x.size(0)), lengths, :])
+        out = self.fc(last_hidden)
         return out
 
 def train(args, model, device, train_loader, optimizer, epoch):
@@ -108,7 +118,7 @@ def test(args, model, device, test_loader):
             test_loss += loss
 
 
-    test_loss /= len(test_loader.dataset)
+    test_loss /= len(test_loader)
     epoch_r2 = metrics.r2_score(y_true, y_pred)
     print('\nTest set: Average loss: {:.4f}, Test r2: {})\n'.format(
         test_loss, epoch_r2))
@@ -162,9 +172,6 @@ def rnn(x_train, y_train, x_test, y_test):
 
     kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
 
-    # x_train, train_lengths = pad(x_train, max_len=500, dim=1)
-    # x_test, test_lengths = pad(x_test, max_len=500, dim=1)
-
     train_loader = DataLoader(
         BowDataset(x_train, y_train),
         batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn, **kwargs)
@@ -175,12 +182,10 @@ def rnn(x_train, y_train, x_test, y_test):
 
     optimizer_type = 'sgd'
 
-    embed_size = 50
-    hidden_size = 20
+    embed_size = 200
+    hidden_size = 100
 
-    # x_train = x_train.reshape((x_train.shape[0], -1, embed_size))
-    # x_test = x_test.reshape((x_test.shape[0], -1, embed_size))
-    model = RNN(1, hidden_size, 1).to(device)
+    model = RNN(embed_size, hidden_size, 2).to(device)
 
     optimizer = get_optimizer(optimizer_type, model)
 

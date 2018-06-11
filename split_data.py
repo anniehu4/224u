@@ -13,6 +13,7 @@ print("Parsed {} student answers.".format(len(data)))
 print("- done.")
 
 def main():
+	random.seed(1)
 	random.shuffle(data)
 
 	train_split = int(0.8 * len(data))
