@@ -149,7 +149,8 @@ def basic_nn(x_train, y_train, x_test, y_test):
         BowDataset(x_test, y_test),
         batch_size=args.test_batch_size, shuffle=True, collate_fn=collate_fn)
 
-    optimizer_type = 'sgd'
+    rnn = False
+    optimizer_type = 'adam'
 
     n_features = x_train.shape[1]
 
