@@ -5,12 +5,14 @@ from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence
 import torch.nn.functional as F
 
 class Net(nn.Module):
-    def __init__(self, n_features):
+    def __init__(self, n_features, classify=False):
         super(Net, self).__init__()
         self.fc1 = nn.Linear(n_features, 100)
         self.fc2 = nn.Linear(100, 1)
 
         self.bn1 = nn.BatchNorm1d(100)
+        self.classify = classify
+        self.classify_fn = nn.Sigmoid()
 
     def forward(self, x, lengths=None):
         x = F.relu(self.fc1(x))
@@ -18,6 +20,8 @@ class Net(nn.Module):
         # x = F.relu(self.bn1(self.fc1(x)))
         # x = F.dropout(x, p=0.2, training=self.training)
         x = self.fc2(x)
+        if self.classify:
+            x = self.classify_fn(x)
         return x
 
 class RNN(nn.Module):

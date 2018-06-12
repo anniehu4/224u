@@ -71,7 +71,7 @@ def train_rnn(model, device, train_loader, optimizer, epoch):
                 epoch, epoch_r2))
     return y_true, y_pred
 
-def train(model, device, train_loader, optimizer, epoch):
+def train(model, device, train_loader, optimizer, criterion, epoch):
     model.train()
     y_true = []
     y_pred = []
@@ -121,7 +121,7 @@ def test_rnn(model, device, test_loader):
         test_loss, epoch_r2))
     return y_true, y_pred
 
-def test(model, device, test_loader):
+def test(model, device, test_loader, criterion):
     model.eval()
     y_true = []
     y_pred = []
@@ -133,8 +133,7 @@ def test(model, device, test_loader):
             output = model(data, None)
             y_pred += output.cpu().detach().numpy().tolist()
 
-            mse = nn.MSELoss()
-            loss = mse(output, target)
+            loss = criterion(output, target)
             #test_loss += F.nll_loss(output, target, size_average=False).item() # sum up batch loss
             test_loss += loss
 
@@ -152,7 +151,15 @@ def get_optimizer(optimizer_type, model):
         optimizer = optim.SGD(model.parameters(), lr=LR, momentum=MOMENTUM)
     return optimizer
 
-def basic_nn(x_train, y_train, x_test, y_test):
+def get_criterion(classify):
+    if classify:
+        criterion = nn.BCELoss()
+    else:
+        criterion = nn.MSELoss() 
+    return criterion
+    
+
+def basic_nn(x_train, y_train, x_test, y_test, classify=False):
     # Training settings
     use_cuda = not NO_CUDA and torch.cuda.is_available()
 
@@ -174,8 +181,9 @@ def basic_nn(x_train, y_train, x_test, y_test):
 
     n_features = x_train.shape[1]
 
-    model = Net(n_features).to(device)
+    model = Net(n_features, classify).to(device)
     optimizer = get_optimizer(optimizer_type, model)
+    criterion = get_criterion(classify)
 
     best_r2 = float("-inf")
     best_epoch = 0
@@ -185,8 +193,8 @@ def basic_nn(x_train, y_train, x_test, y_test):
     best_train_pred = []
     for epoch in range(1, EPOCHS + 1):
         print("===================")
-        train_true, train_pred = train(model, device, train_loader, optimizer, epoch)
-        test_true, test_pred = test(model, device, test_loader)
+        train_true, train_pred = train(model, device, train_loader, optimizer, criterion, epoch)
+        test_true, test_pred = test(model, device, test_loader, criterion)
         epoch_r2 = metrics.r2_score(test_true, test_pred)
         if epoch_r2 > best_r2:
             best_r2 = epoch_r2
