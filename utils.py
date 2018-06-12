@@ -31,15 +31,12 @@ def camel_case_process(s):
     return joined
 
 def spellcheck(s):
-    print("===")
-    print(s)
     spell = SpellChecker()
 
     words = s.split()
     correct_words = []
     for w in words:
         correct_words.append(spell.correction(w))
-    print(" ".join(correct_words))
     return " ".join(correct_words)
 
 def process(s, remove_numbers=False, use_spellcheck=False):
