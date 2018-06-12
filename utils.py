@@ -30,6 +30,13 @@ def camel_case_process(s):
     return joined
 
 def process(s):
+    """
+    Parameters:
+     - s: Raw text corresponding to a student answer.
+    ==============================
+    Returns:
+     - s: String of cleaned, separated, lower case text.
+    """
     s = s.replace('(', ' ').replace(')', ' ')
     s = s.replace('\n', ' ').replace('\t', '')
     # starter code sometimes has a /** 1a **/ with the problem number
@@ -37,7 +44,7 @@ def process(s):
     if '/**' in s:
         s = s[s.find('**/') + 3:].strip()
     # remove other punctuation (e.g. {, =, *)
-    s = re.sub(r'[^\w\s]', '', s)
+    s = re.sub(r'[^\w\s]', ' ', s)
     # handle snake case
     s = s.replace('_', ' ')
     # remove extraneous whitespace
@@ -46,15 +53,24 @@ def process(s):
     return s.lower()
 
 def embed(s, lookup, dim=50, bow=True, collate=False):
+    """
+    Parameters:
+     - s: String of processed text with each word separated by a space.
+    ==============================
+    Returns:
+     - s: String of cleaned, separated, lower case text.
+    """
     s = s.split(' ')
     if bow:
         s = set(s) # bag of words
     if collate:
+        # sum GloVe vectors
         tokens = np.zeros(dim)
         for x in s:
             if x in lookup:
                 tokens += lookup[x]
     else:
+        # concatenate GloVe vectors
         tokens = [lookup[x] for x in s if x in lookup]
     return np.array(tokens)
 

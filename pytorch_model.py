@@ -1,10 +1,12 @@
 from __future__ import print_function
+import sys
 import argparse
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+from model.architecture import Net, RNN
 from torch.utils.data import Dataset, DataLoader
 from torchvision import datasets, transforms
 from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence
@@ -17,8 +19,8 @@ parser.add_argument('--batch-size', type=int, default=64, metavar='N',
                     help='input batch size for training (default: 64)')
 parser.add_argument('--test-batch-size', type=int, default=10, metavar='N',
                     help='input batch size for testing (default: 1)')
-parser.add_argument('--epochs', type=int, default=20, metavar='N',
-                    help='number of epochs to train (default: 20)')
+parser.add_argument('--epochs', type=int, default=30, metavar='N',
+                    help='number of epochs to train (default: 30)')
 parser.add_argument('--lr', type=float, default=0.001, metavar='LR',
                     help='learning rate (default: 0.001)')
 parser.add_argument('--momentum', type=float, default=0.5, metavar='M',
@@ -31,54 +33,19 @@ parser.add_argument('--log-interval', type=int, default=50, metavar='N',
                     help='how many batches to wait before logging training status')
 args = parser.parse_args()
 
-class Net(nn.Module):
-    def __init__(self, n_features):
-        super(Net, self).__init__()
-        self.fc1 = nn.Linear(n_features, 100)
-        self.fc2 = nn.Linear(100, 1)
-
-    def forward(self, x, lengths=None):
-        x = F.relu(self.fc1(x))
-        # x = F.dropout(x, p=0.2, training=self.training)
-        x = self.fc2(x)
-        return x
-
-class RNN(nn.Module):
-    def __init__(self, input_size, hidden_size, num_layers):
-        super(RNN, self).__init__()
-        self.hidden_size = hidden_size
-        self.input_size = input_size
-        self.num_layers = num_layers
-        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
-        # self.fc1 = nn.Linear()
-        self.fc = nn.Linear(hidden_size, 1)
-    
-    def forward(self, x, lengths):
-        # Set initial hidden and cell states 
-        h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size) 
-        c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size)
-        if self.input_size == 1:
-            packed = pack_padded_sequence(x.unsqueeze(2), lengths, batch_first=True)
-        else:
-            packed = x.unsqueeze(1)
-        
-        # Forward propagate LSTM
-        hidden, _ = self.lstm(packed, (h0, c0))
-        if self.input_size == 1:
-            hidden, _ = pad_packed_sequence(hidden, batch_first=True)
-            print(hidden.data.shape)
-            last_hidden = hidden[np.arange(x.size(0)), lengths, :]
-        else:
-            last_hidden = hidden[:, -1, :]
-        # Decode the hidden state of the last time step
-        out = self.fc(last_hidden)
-        return out
 
 def train(args, model, device, train_loader, optimizer, epoch):
     model.train()
     y_true = []
     y_pred = []
     for batch_idx, (data, target, lengths) in enumerate(train_loader):
+        #print(data.shape)
+        #print(target.shape)
+        #print(len(lengths))
+        #print(lengths)
+        #print("====")
+
+
         data, target = data.to(device).float(), target.to(device).float()
         y_true += target.numpy().tolist()
 
@@ -149,7 +116,6 @@ def basic_nn(x_train, y_train, x_test, y_test):
         BowDataset(x_test, y_test),
         batch_size=args.test_batch_size, shuffle=True, collate_fn=collate_fn)
 
-    rnn = False
     optimizer_type = 'adam'
 
     n_features = x_train.shape[1]
@@ -157,10 +123,27 @@ def basic_nn(x_train, y_train, x_test, y_test):
     model = Net(n_features).to(device)
     optimizer = get_optimizer(optimizer_type, model)
 
+    best_r2 = float("-inf")
+    best_epoch = 0
+    best_test_true = []
+    best_test_pred = []
+    best_train_true = []
+    best_train_pred = []
     for epoch in range(1, args.epochs + 1):
+        print("===================")
         train_true, train_pred = train(args, model, device, train_loader, optimizer, epoch)
         test_true, test_pred = test(args, model, device, test_loader)
+        epoch_r2 = metrics.r2_score(test_true, test_pred)
+        if epoch_r2 > best_r2:
+            best_r2 = epoch_r2
+            best_epoch = epoch
+            best_test_true = test_true
+            best_test_pred = test_pred
+            best_train_true = train_true
+            best_train_pred = train_pred
 
+    print("===================")
+    print('\nBest Test r2: {} on epoch: {})\n'.format(best_r2, best_epoch))
     return (train_true, train_pred, test_true, test_pred)
 
 
@@ -190,8 +173,25 @@ def rnn(x_train, y_train, x_test, y_test):
 
     optimizer = get_optimizer(optimizer_type, model)
 
+    best_r2 = float("-inf")
+    best_epoch = 0
+    best_test_true = []
+    best_test_pred = []
+    best_train_true = []
+    best_train_pred = []
+
     for epoch in range(1, args.epochs + 1):
         train_true, train_pred = train(args, model, device, train_loader, optimizer, epoch)
         test_true, test_pred = test(args, model, device, test_loader)
+        epoch_r2 = metrics.r2_score(test_true, test_pred)
+        if epoch_r2 > best_r2:
+            best_r2 = epoch_r2
+            best_epoch = epoch
+            best_test_true = test_true
+            best_test_pred = test_pred
+            best_train_true = train_true
+            best_train_pred = train_pred
 
+    print("===================")
+    print('\nBest Test r2: {} on epoch: {})\n'.format(best_r2, best_epoch))
     return (train_true, train_pred, test_true, test_pred)
