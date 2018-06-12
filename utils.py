@@ -5,13 +5,14 @@ import random
 import numpy as np
 import keyword
 from sklearn.metrics import f1_score
+from spellchecker import SpellChecker
 
 def prepare_data(data, use_normalized):
     answers = [d['answer'] for d in data]
     if use_normalized:
-        scores = np.array([d['scoreNormalized'] for d in data]).astype(np.float)
+        scores = np.array([d['scoreNormalized'] for d in data]).astype(np.float).reshape(-1, 1)
     else:
-        scores = np.array([d['score'] for d in data]).astype(np.float)
+        scores = np.array([d['score'] for d in data]).astype(np.float).reshape(-1, 1)
 
     return (answers, scores)
 
@@ -29,7 +30,19 @@ def camel_case_process(s):
     joined = " ".join(cc_split_words)
     return joined
 
-def process(s):
+def spellcheck(s):
+    print("===")
+    print(s)
+    spell = SpellChecker()
+
+    words = s.split()
+    correct_words = []
+    for w in words:
+        correct_words.append(spell.correction(w))
+    print(" ".join(correct_words))
+    return " ".join(correct_words)
+
+def process(s, remove_numbers=False, use_spellcheck=False):
     """
     Parameters:
      - s: Raw text corresponding to a student answer.
@@ -38,21 +51,25 @@ def process(s):
      - s: String of cleaned, separated, lower case text.
     """
     s = s.replace('(', ' ').replace(')', ' ')
-    s = s.replace('\n', ' ').replace('\t', '')
+    s = s.replace('\n', ' ').replace('\t', ' ')
     # starter code sometimes has a /** 1a **/ with the problem number
     # unclear if this is removing important comments though
     if '/**' in s:
         s = s[s.find('**/') + 3:].strip()
     # remove other punctuation (e.g. {, =, *)
     s = re.sub(r'[^\w\s]', ' ', s)
+    if remove_numbers:
+        s = re.sub('[0-9]', ' ', s)
     # handle snake case
     s = s.replace('_', ' ')
     # remove extraneous whitespace
     s = re.sub(' +', ' ', s)
     s = camel_case_process(s)
+    if use_spellcheck:
+        s = spellcheck(s)
     return s.lower()
 
-def embed(s, lookup, dim=50, bow=True, collate=False):
+def embed(s, lookup, dim=50, bow=True, collate_fn=None):
     """
     Parameters:
      - s: String of processed text with each word separated by a space.
@@ -63,16 +80,19 @@ def embed(s, lookup, dim=50, bow=True, collate=False):
     s = s.split(' ')
     if bow:
         s = set(s) # bag of words
-    if collate:
+
+    tokens = np.array([lookup[x] for x in s if x in lookup])
+    # concatenate GloVe vectors
+
+    if collate_fn == "sum":
+        tokens = np.sum(tokens, axis=0) #keep_dims=True
         # sum GloVe vectors
-        tokens = np.zeros(dim)
-        for x in s:
-            if x in lookup:
-                tokens += lookup[x]
-    else:
-        # concatenate GloVe vectors
-        tokens = [lookup[x] for x in s if x in lookup]
-    return np.array(tokens)
+    elif collate_fn == "avg":
+        tokens = np.average(tokens, axis=0) #keep_dims=True
+        # sum GloVe vectors
+         
+    return tokens
+
 
 # separates code keywords (private, void, for, int) from non-keywords
 def filter_keywords(s):

@@ -21,6 +21,7 @@ class Net(nn.Module):
         return x
 
 class RNN(nn.Module):
+    # input_size = embed_sz
     def __init__(self, input_size, hidden_size, num_layers):
         super(RNN, self).__init__()
         self.hidden_size = hidden_size
@@ -31,34 +32,19 @@ class RNN(nn.Module):
         self.fc = nn.Linear(hidden_size, 1)
     
     def forward(self, x, lengths):
+        # x.size() = (batch_size, max_seq_len, embed_sz)
+        batch_size = x.size(0)
         # Set initial hidden and cell states 
         h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size) 
         c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size)
-        if self.input_size == 1:
-            packed = pack_padded_sequence(x.unsqueeze(2), lengths, batch_first=True)
-        else:
-            packed = x.unsqueeze(1)
-        
+
+        packed = pack_padded_sequence(x, lengths, batch_first=True)
         # Forward propagate LSTM
-        """
-        print(type(x))
-        print(x.type())
-        print(x.size())
-        print(x)
-        print('-')
-        print(type(packed))
-        print(packed.type())
-        print(packed.size())
-        print(packed)
-        print("-=========")
-        """
-        hidden, _ = self.lstm(packed, (h0, c0))
-        if self.input_size == 1:
-            hidden, _ = pad_packed_sequence(hidden, batch_first=True)
-            print(hidden.data.shape)
-            last_hidden = hidden[np.arange(x.size(0)), lengths, :]
-        else:
-            last_hidden = hidden[:, -1, :]
+        output, _ = self.lstm(packed, (h0, c0))
+        output, _ = pad_packed_sequence(output, batch_first=True)
+        #  output size is (batch, seq_len, hidden_size * num_directions)
+        last_hidden = output[np.arange(batch_size), lengths, :]
+        # last_hidden size is (batch_size, hidden_size)
         # Decode the hidden state of the last time step
         out = self.fc(last_hidden)
         return out

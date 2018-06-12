@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 from torch.utils.data import Dataset, DataLoader
 
 class BowDataset(Dataset):
@@ -10,7 +11,7 @@ class BowDataset(Dataset):
                 on a sample.
         """
         self.x = x
-        self.y = torch.tensor(y)
+        self.y = y
         self.transform = transform
 
     def __len__(self):
@@ -18,7 +19,7 @@ class BowDataset(Dataset):
 
     def __getitem__(self, idx):
         #sample = {'x': self.x[idx], 'y': self.y[idx]}
-        sample = (torch.tensor(self.x[idx]), self.y[idx])
+        sample = (torch.tensor(self.x[idx]), torch.tensor(self.y[idx]))
         return sample
 
 def collate_fn(data):
@@ -35,16 +36,32 @@ def collate_fn(data):
         scores: torch tensor of shape (batch_size, 1).
         lengths: list; valid length for each padded answer.
     """
+    # data is list of (answer, score) pairs, len(data) = batch_size
+    # where answer is tensor of size (seq_len, hidden_dim)
+
     # Sort a data list by caption length (descending order).
     data.sort(key=lambda x: len(x[0]), reverse=True)
+
     answers, scores = zip(*data)
+    # answers is tuple of length batch_size
+    # scores is tuple of length batch_size
+
     scores = torch.stack(scores, 0)
+    # scores is torch tensor of size [64, 1]
+
+    batch_size = len(answers)
+    embed_sz = answers[0].size(1)
 
     # Pad answer
-    lengths = [len(answer) for answer in answers]
-    padded = torch.zeros(len(answers), max(lengths)).long()
+    lengths = np.array([len(answer) for answer in answers])
+    padded = torch.zeros(batch_size, max(lengths), embed_sz).float()
+
+    # padded is (batch_size, seq_len, embed_sz)
     for i, answer in enumerate(answers):
         end = lengths[i]
-        padded[i, :end] = answer[:end]
+        padded[i, :end, :] = answer[:end, :]
 
-    return padded, scores, lengths
+    # padded is FloatTensor, size=(batch_size, seq_len, embed_sz)
+    # scores is DoubleTensor, size=(batch_size, 1)
+    # lengths is numpy array, size=(batch_size)
+    return (padded, scores, lengths)
