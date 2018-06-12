@@ -20,9 +20,9 @@ def main():
 	vocab = pickle.load(open('data/vocab.pkl', 'rb'))
 
 	normalize_scores = False
-	use_nn = False
-	use_rnn = True
-	use_embed = True
+	use_nn = True
+	use_rnn = False
+	use_embed = False
 	collate = True
 	dim = 200
 
@@ -30,10 +30,12 @@ def main():
 	dev_answers, dev_scores = prepare_data(dev_data, normalize_scores)
 	print(" - done.")
 
-	print("Preparing glove data...")
-	glove_home = os.path.join('vsmdata', 'glove.6B')
-	glove_lookup = glove2dict(os.path.join(glove_home, 'glove.6B.%dd.txt' % dim))
-	print(" - done.")
+	if use_embed:
+		print("Preparing glove data...")
+		glove_home = os.path.join('vsmdata', 'glove.6B')
+		glove_lookup = glove2dict(os.path.join(glove_home, 'glove.6B.%dd.txt' % dim))
+		print(" - done.")
+
 	train_x = []
 	dev_x = []
 
