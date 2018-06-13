@@ -8,8 +8,8 @@ class Net(nn.Module):
     def __init__(self, n_features, classify=False):
         super(Net, self).__init__()
         self.fc1 = nn.Linear(n_features, 100)
-        self.fc2 = nn.Linear(100, 1)
-        # self.fc3 = nn.Linear(50, 1)
+        self.fc2 = nn.Linear(100, 50)
+        self.fc3 = nn.Linear(50, 1)
 
         self.bn1 = nn.BatchNorm1d(100)
         self.classify = classify
@@ -17,13 +17,12 @@ class Net(nn.Module):
 
     def forward(self, x, lengths=None):
         x = F.relu(self.fc1(x))
-        embed = x
         # TODO: can add batch_norm and dropout if wanted
         # x = F.relu(self.bn1(self.fc1(x)))
-        # x = F.dropout(x, p=0.2, training=self.training)
-        # x = F.relu(self.fc2(x))
-        # embed = x
-        x = self.fc2(x)
+        # x = F.dropout(x, p=0.5, training=self.training)
+        x = F.relu(self.fc2(x))
+        embed = x
+        x = self.fc3(x)
         if self.classify:
             x = self.classify_fn(x)
         return x, embed

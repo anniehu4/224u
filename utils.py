@@ -72,7 +72,9 @@ def spellcheck(s):
     words = s.split()
     correct_words = []
     for w in words:
-        if w not in lookup:
+        if (not w.isalpha()) or keyword.iskeyword(w):
+            correct_words.append(w)
+        elif w not in lookup:
             correct_words.append(spell.correction(w))
             count += 1
         else:

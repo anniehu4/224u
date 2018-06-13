@@ -97,8 +97,11 @@ def train(model, device, train_loader, optimizer, criterion, epoch, classify):
     if classify:
         y_true = np.array(y_true)
         y_pred = np.array([1.0 if pred > 0.5 else 0.0 for pred in y_pred])
+        precision, recall, f1, _ = metrics.precision_recall_fscore_support(y_true, y_pred)
+
         print('Train Epoch: {} Train acc: {}'.format(
                 epoch, 100. * np.mean(y_true == y_pred)))
+
     else:
         epoch_r2 = metrics.r2_score(y_true, y_pred)
         print('Train Epoch: {} Train r2: {}'.format(
@@ -161,8 +164,7 @@ def test(model, device, test_loader, criterion, classify):
         metric = epoch_r2
         print('Test loss: {} Test r2: {}'.format(test_loss, epoch_r2))
 
-    pickle.dump((y_true, y_pred, embeds), open('data/learned_embeds.pkl', 'wb'))
-    return y_true, y_pred, metric
+    return y_true, y_pred, metric, embeds
 
 def get_optimizer(optimizer_type, model):
     if optimizer_type == 'adam':
@@ -215,7 +217,7 @@ def basic_nn(x_train, y_train, x_test, y_test, classify=False):
     for epoch in range(1, EPOCHS + 1):
         print("===================")
         train_true, train_pred = train(model, device, train_loader, optimizer, criterion, epoch, classify)
-        test_true, test_pred, metric = test(model, device, test_loader, criterion, classify)
+        test_true, test_pred, metric, embeds = test(model, device, test_loader, criterion, classify)
         if metric > best_metric:
             best_metric = metric
             best_epoch = epoch
@@ -223,6 +225,7 @@ def basic_nn(x_train, y_train, x_test, y_test, classify=False):
             best_test_pred = test_pred
             best_train_true = train_true
             best_train_pred = train_pred
+            pickle.dump((test_true, test_pred, embeds), open('data/learned_embeds.pkl', 'wb'))
 
     print("===================")
     if classify:
