@@ -28,6 +28,8 @@ arg_parser.add_argument('--collate-fn', type=str, default="sum",
                         help='avg or sum, used for nn model only')
 arg_parser.add_argument('--remove-numbers', action='store_true', default=False,
                         help='in preproc, replace numbers if true')
+arg_parser.add_argument('--strip-starter', action='store_true', default=True,
+                        help='in prepare data, strip starter code if true')
 arg_parser.add_argument('--classify', action='store_true', default=False,
                         help='classification problem if True, regression otherwise')
 arg_parser.add_argument('--use-spellcheck', action='store_true', default=False,
@@ -53,8 +55,8 @@ def main():
 		args.normalize_scores = True
 
 	# answers is list of strings, scores is numpy array of shape (len,)
-	train_answers, train_scores = prepare_data(train_data, args.normalize_scores)
-	dev_answers, dev_scores = prepare_data(dev_data, args.normalize_scores)
+	train_answers, train_scores = prepare_data(train_data, args.normalize_scores, args.strip_starter)
+	dev_answers, dev_scores = prepare_data(dev_data, args.normalize_scores, args.strip_starter)
 	print(" - done.")
 
 	if args.use_embed:

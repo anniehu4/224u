@@ -1,4 +1,5 @@
 import re
+import os
 import sys
 import csv
 import random
@@ -7,8 +8,41 @@ import keyword
 from sklearn.metrics import f1_score
 # from spellchecker import SpellChecker
 
-def prepare_data(data, use_normalized):
-    answers = [d['answer'] for d in data]
+def strip_starter_code(answers):
+    stripped_answers = []
+    STARTER_DATA_DIR = 'finalWin18'
+    exam_with_label = 'FinalWin18'
+
+    for row in answers:
+        question = row['question']
+        answer = row['answer']
+        if exam_with_label in question:
+            #print(question)
+
+            answer = answer.split('\n')
+            answer = list(filter(None, answer)) # fastest
+            
+            question_num = question.split('-')[0]
+
+            starter_code_path = os.path.join(STARTER_DATA_DIR, '{}.txt'.format(question_num))
+            with open(starter_code_path) as f:
+                content = f.readlines()
+            content = [x.rstrip() for x in content] 
+            content = list(filter(None, content)) # fastest
+            
+            for line in content:
+                if line in answer:
+                    answer.remove(line)
+
+        stripped_answers.append(answer)
+    return stripped_answers
+
+def prepare_data(data, use_normalized, strip_starter_code=True):
+    if strip_starter_code:
+        answers = strip_starter_code(data)
+    else:
+        answers = [d['answer'] for d in data]
+        
     if use_normalized:
         scores = np.array([d['scoreNormalized'] for d in data]).astype(np.float).reshape(-1, 1)
     else:
@@ -29,8 +63,6 @@ def camel_case_process(s):
 
     joined = " ".join(cc_split_words)
     return joined
-
-def strip_starter_code(starter, student):
 
 
 def spellcheck(s):
