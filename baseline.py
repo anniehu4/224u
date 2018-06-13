@@ -18,8 +18,6 @@ from vocab import Vocabulary
 arg_parser = argparse.ArgumentParser(description="parser for cs224u project")
 arg_parser.add_argument('--data_dir', default='data', help="Directory containing the dataset")
 
-
-
 arg_parser.add_argument("--name", type=str, default=None,
                               help="name for the model")
 arg_parser.add_argument('--model', type=str, default="nn",
@@ -34,17 +32,21 @@ arg_parser.add_argument('--classify', action='store_true', default=False,
                         help='classification problem if True, regression otherwise')
 arg_parser.add_argument('--use-spellcheck', action='store_true', default=False,
                         help='in preproc, spellcheck all words if true')
-arg_parser.add_argument('--normalize-scores', action='store_true', default=False,
+arg_parser.add_argument('--normalize-scores', action='store_true', default=True,
                         help='True to predict normalized scores (min 0, max 1)')
 arg_parser.add_argument('--glove-dim', type=int, default=200,
 						help='dimension for GloVe embeddings')
 args = arg_parser.parse_args()
 
+holdout = True 
+TRAIN_FILE = 'data/%strain.pkl' % 'holdout-' if holdout else ''
+DEV_FILE = 'data/%sdev.pkl' % 'holdout-' if holdout else ''
+
 
 def main():
 	print("Loading training data...")
-	train_data = pickle.load(open('data/train.pkl', 'rb'))
-	dev_data = pickle.load(open('data/dev.pkl', 'rb'))
+	train_data = pickle.load(open(TRAIN_FILE, 'rb'))
+	dev_data = pickle.load(open(DEV_FILE, 'rb'))
 	vocab = pickle.load(open('data/vocab.pkl', 'rb'))
 
 	if args.classify:
@@ -55,10 +57,12 @@ def main():
 	dev_answers, dev_scores = prepare_data(dev_data, args.normalize_scores)
 	print(" - done.")
 
-	print("Preparing glove data...")
-	glove_home = os.path.join('vsmdata', 'glove.6B')
-	glove_lookup = glove2dict(os.path.join(glove_home, 'glove.6B.%dd.txt' % args.glove_dim))
-	print(" - done.")
+	if args.use_embed:
+		print("Preparing glove data...")
+		glove_home = os.path.join('vsmdata', 'glove.6B')
+		glove_lookup = glove2dict(os.path.join(glove_home, 'glove.6B.%dd.txt' % args.glove_dim))
+		print(" - done.")
+
 	train_x = []
 	dev_x = []
 

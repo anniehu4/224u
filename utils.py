@@ -5,7 +5,7 @@ import random
 import numpy as np
 import keyword
 from sklearn.metrics import f1_score
-from spellchecker import SpellChecker
+# from spellchecker import SpellChecker
 
 def prepare_data(data, use_normalized):
     answers = [d['answer'] for d in data]
@@ -67,7 +67,7 @@ def process(s, remove_numbers=False, use_spellcheck=False):
     s = camel_case_process(s)
     if use_spellcheck:
         s = spellcheck(s)
-    return s.lower()
+    return filter_keywords(s.lower())
 
 def embed(s, lookup, dim=50, bow=True, collate_fn=None):
     """
@@ -105,7 +105,7 @@ def filter_keywords(s):
             count_keywords += 1
         else:
             words.append(x)
-    return ' '.join(words)
+    return ' '.join(keywords)
 
 def pad(features, max_len, dim=50):
     for i, row in enumerate(features):
