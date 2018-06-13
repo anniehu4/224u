@@ -30,9 +30,11 @@ def camel_case_process(s):
     joined = " ".join(cc_split_words)
     return joined
 
+def strip_starter_code(starter, student):
+    pass
+
 def spellcheck(s, lookup):
     print("===")
-
     spell = SpellChecker()
     count = 0
     words = s.split()

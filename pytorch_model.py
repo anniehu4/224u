@@ -6,6 +6,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+import pickle
 from model.architecture import Net, RNN
 from torch.utils.data import Dataset, DataLoader
 from torchvision import datasets, transforms
@@ -79,7 +80,7 @@ def train(model, device, train_loader, optimizer, criterion, epoch, classify):
         data, target = data.to(device).float(), target.to(device).float()
         y_true += np.reshape(target.numpy(), -1).tolist()
 
-        output = model(data, None)
+        output, embed = model(data, None)
         y_pred += np.reshape(output.cpu().detach().numpy(), -1).tolist()
 
         mse = nn.MSELoss()
@@ -102,6 +103,7 @@ def train(model, device, train_loader, optimizer, criterion, epoch, classify):
         epoch_r2 = metrics.r2_score(y_true, y_pred)
         print('Train Epoch: {} Train r2: {}'.format(
                 epoch, epoch_r2))
+
     return y_true, y_pred
 
 def test_rnn(model, device, test_loader):
@@ -132,12 +134,14 @@ def test(model, device, test_loader, criterion, classify):
     model.eval()
     y_true = []
     y_pred = []
+    embeds = []
     test_loss = 0
     with torch.no_grad():
         for data, target in test_loader:
             data, target = data.to(device).float(), target.to(device).float()
             y_true += np.reshape(target.numpy(), -1).tolist()
-            output = model(data, None)
+            output, embed = model(data, None)
+            embeds += embed.cpu().detach().numpy().tolist()
             y_pred += np.reshape(output.cpu().detach().numpy(), -1).tolist()
 
             loss = criterion(output, target)
@@ -156,6 +160,8 @@ def test(model, device, test_loader, criterion, classify):
         epoch_r2 = metrics.r2_score(y_true, y_pred)
         metric = epoch_r2
         print('Test loss: {} Test r2: {}'.format(test_loss, epoch_r2))
+
+    pickle.dump((y_true, y_pred, embeds), open('data/learned_embeds.pkl', 'wb'))
     return y_true, y_pred, metric
 
 def get_optimizer(optimizer_type, model):

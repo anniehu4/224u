@@ -1,5 +1,6 @@
 *.pkl
 vsmdata/*
+finalWin18/*
 *.pyc
 .DS_Store
 __pycache__/*
