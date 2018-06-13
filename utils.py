@@ -5,7 +5,7 @@ import random
 import numpy as np
 import keyword
 from sklearn.metrics import f1_score
-# from spellchecker import SpellChecker
+from spellchecker import SpellChecker
 
 def prepare_data(data, use_normalized):
     answers = [d['answer'] for d in data]
@@ -30,16 +30,24 @@ def camel_case_process(s):
     joined = " ".join(cc_split_words)
     return joined
 
-def spellcheck(s):
-    spell = SpellChecker()
+def spellcheck(s, lookup):
+    print("===")
 
+    spell = SpellChecker()
+    count = 0
     words = s.split()
     correct_words = []
     for w in words:
-        correct_words.append(spell.correction(w))
+        if w not in lookup:
+            correct_words.append(spell.correction(w))
+            count += 1
+        else:
+            correct_words.append(w)
+    # print(" ".join(correct_words))
+    print(count, "words changed")
     return " ".join(correct_words)
 
-def process(s, remove_numbers=False, use_spellcheck=False):
+def process(s, lookup, remove_numbers=False, use_spellcheck=False):
     """
     Parameters:
      - s: Raw text corresponding to a student answer.
@@ -63,8 +71,8 @@ def process(s, remove_numbers=False, use_spellcheck=False):
     s = re.sub(' +', ' ', s)
     s = camel_case_process(s)
     if use_spellcheck:
-        s = spellcheck(s)
-    return filter_keywords(s.lower())
+        s = spellcheck(s, lookup)
+    return s.lower()
 
 def embed(s, lookup, dim=50, bow=True, collate_fn=None):
     """
@@ -87,7 +95,7 @@ def embed(s, lookup, dim=50, bow=True, collate_fn=None):
     elif collate_fn == "avg":
         tokens = np.average(tokens, axis=0) #keep_dims=True
         # sum GloVe vectors
-         
+
     return tokens
 
 
@@ -102,7 +110,7 @@ def filter_keywords(s):
             count_keywords += 1
         else:
             words.append(x)
-    return ' '.join(keywords)
+    return ' '.join(words)
 
 def pad(features, max_len, dim=50):
     for i, row in enumerate(features):
