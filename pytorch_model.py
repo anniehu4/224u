@@ -71,16 +71,16 @@ def train_rnn(model, device, train_loader, optimizer, epoch):
                 epoch, epoch_r2))
     return y_true, y_pred
 
-def train(model, device, train_loader, optimizer, criterion, epoch):
+def train(model, device, train_loader, optimizer, criterion, epoch, classify):
     model.train()
     y_true = []
     y_pred = []
     for batch_idx, (data, target) in enumerate(train_loader):
         data, target = data.to(device).float(), target.to(device).float()
-        y_true += target.numpy().tolist()
+        y_true += np.reshape(target.numpy(), -1).tolist()
 
         output = model(data, None)
-        y_pred += output.cpu().detach().numpy().tolist()
+        y_pred += np.reshape(output.cpu().detach().numpy(), -1).tolist()
 
         mse = nn.MSELoss()
         loss = mse(output, target)
@@ -92,8 +92,15 @@ def train(model, device, train_loader, optimizer, criterion, epoch):
                 epoch, batch_idx * len(data), len(train_loader.dataset),
                 100. * batch_idx / len(train_loader), loss.item()))
 
-    epoch_r2 = metrics.r2_score(y_true, y_pred)
-    print('Train Epoch: {} Train r2: {}'.format(
+
+    if classify:
+        y_true = np.array(y_true)
+        y_pred = np.array([1.0 if pred > 0.5 else 0.0 for pred in y_pred])
+        print('Train Epoch: {} Train acc: {}'.format(
+                epoch, 100. * np.mean(y_true == y_pred)))
+    else:
+        epoch_r2 = metrics.r2_score(y_true, y_pred)
+        print('Train Epoch: {} Train r2: {}'.format(
                 epoch, epoch_r2))
     return y_true, y_pred
 
@@ -105,9 +112,9 @@ def test_rnn(model, device, test_loader):
     with torch.no_grad():
         for data, target, lengths in test_loader:
             data, target = data.to(device).float(), target.to(device).float()
-            y_true += target.numpy().tolist()
+            y_true += np.reshape(target.numpy(), -1).tolist()
             output = model(data, lengths)
-            y_pred += output.cpu().detach().numpy().tolist()
+            y_pred += np.reshape(output.cpu().detach().numpy(), -1).tolist()
 
             mse = nn.MSELoss()
             loss = mse(output, target)
@@ -121,7 +128,7 @@ def test_rnn(model, device, test_loader):
         test_loss, epoch_r2))
     return y_true, y_pred
 
-def test(model, device, test_loader, criterion):
+def test(model, device, test_loader, criterion, classify):
     model.eval()
     y_true = []
     y_pred = []
@@ -129,9 +136,9 @@ def test(model, device, test_loader, criterion):
     with torch.no_grad():
         for data, target in test_loader:
             data, target = data.to(device).float(), target.to(device).float()
-            y_true += target.numpy().tolist()
+            y_true += np.reshape(target.numpy(), -1).tolist()
             output = model(data, None)
-            y_pred += output.cpu().detach().numpy().tolist()
+            y_pred += np.reshape(output.cpu().detach().numpy(), -1).tolist()
 
             loss = criterion(output, target)
             #test_loss += F.nll_loss(output, target, size_average=False).item() # sum up batch loss
@@ -139,10 +146,17 @@ def test(model, device, test_loader, criterion):
 
 
     test_loss /= len(test_loader)
-    epoch_r2 = metrics.r2_score(y_true, y_pred)
-    print('\nTest set: Average loss: {:.4f}, Test r2: {})\n'.format(
-        test_loss, epoch_r2))
-    return y_true, y_pred
+    if classify:
+        y_true = np.array(y_true)
+        y_pred = np.array([1.0 if pred > 0.5 else 0.0 for pred in y_pred])
+        acc = 100. * np.mean(y_true == y_pred)
+        metric = acc
+        print('Test loss: {} Test acc: {}'.format(test_loss, acc))
+    else:
+        epoch_r2 = metrics.r2_score(y_true, y_pred)
+        metric = epoch_r2
+        print('Test loss: {} Test r2: {}'.format(test_loss, epoch_r2))
+    return y_true, y_pred, metric
 
 def get_optimizer(optimizer_type, model):
     if optimizer_type == 'adam':
@@ -185,19 +199,19 @@ def basic_nn(x_train, y_train, x_test, y_test, classify=False):
     optimizer = get_optimizer(optimizer_type, model)
     criterion = get_criterion(classify)
 
-    best_r2 = float("-inf")
+    best_metric = float("-inf")
     best_epoch = 0
     best_test_true = []
     best_test_pred = []
     best_train_true = []
     best_train_pred = []
+
     for epoch in range(1, EPOCHS + 1):
         print("===================")
-        train_true, train_pred = train(model, device, train_loader, optimizer, criterion, epoch)
-        test_true, test_pred = test(model, device, test_loader, criterion)
-        epoch_r2 = metrics.r2_score(test_true, test_pred)
-        if epoch_r2 > best_r2:
-            best_r2 = epoch_r2
+        train_true, train_pred = train(model, device, train_loader, optimizer, criterion, epoch, classify)
+        test_true, test_pred, metric = test(model, device, test_loader, criterion, classify)
+        if metric > best_metric:
+            best_metric = metric
             best_epoch = epoch
             best_test_true = test_true
             best_test_pred = test_pred
@@ -205,7 +219,10 @@ def basic_nn(x_train, y_train, x_test, y_test, classify=False):
             best_train_pred = train_pred
 
     print("===================")
-    print('\nBest Test r2: {} on epoch: {})\n'.format(best_r2, best_epoch))
+    if classify:
+        print('\nBest Test acc: {} on epoch: {})\n'.format(best_metric, best_epoch))
+    else:
+        print('\nBest Test r2: {} on epoch: {})\n'.format(best_metric, best_epoch))
     return (train_true, train_pred, test_true, test_pred)
 
 
@@ -239,7 +256,7 @@ def rnn(x_train, y_train, x_test, y_test):
 
     optimizer = get_optimizer(optimizer_type, model)
 
-    best_r2 = float("-inf")
+    best_metric = float("-inf")
     best_epoch = 0
     best_test_true = []
     best_test_pred = []
@@ -247,11 +264,10 @@ def rnn(x_train, y_train, x_test, y_test):
     best_train_pred = []
 
     for epoch in range(1, EPOCHS + 1):
-        train_true, train_pred = train_rnn(model, device, train_loader, optimizer, epoch)
-        test_true, test_pred = test_rnn(model, device, test_loader)
-        epoch_r2 = metrics.r2_score(test_true, test_pred)
-        if epoch_r2 > best_r2:
-            best_r2 = epoch_r2
+        train_true, train_pred = train_rnn(model, device, train_loader, optimizer, epoch, False)
+        test_true, test_pred, metric = test_rnn(model, device, test_loader, False)
+        if metric > best_metric:
+            best_metric = metric
             best_epoch = epoch
             best_test_true = test_true
             best_test_pred = test_pred
@@ -259,5 +275,8 @@ def rnn(x_train, y_train, x_test, y_test):
             best_train_pred = train_pred
 
     print("===================")
-    print('\nBest Test r2: {} on epoch: {})\n'.format(best_r2, best_epoch))
+    if classify:
+        print('\nBest Test acc: {} on epoch: {})\n'.format(best_metric, best_epoch))
+    else:
+        print('\nBest Test r2: {} on epoch: {})\n'.format(best_metric, best_epoch))
     return (train_true, train_pred, test_true, test_pred)

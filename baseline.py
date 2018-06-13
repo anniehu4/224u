@@ -47,6 +47,9 @@ def main():
 	dev_data = pickle.load(open('data/dev.pkl', 'rb'))
 	vocab = pickle.load(open('data/vocab.pkl', 'rb'))
 
+	if args.classify:
+		args.normalize_scores = True
+
 	# answers is list of strings, scores is numpy array of shape (len,)
 	train_answers, train_scores = prepare_data(train_data, args.normalize_scores)
 	dev_answers, dev_scores = prepare_data(dev_data, args.normalize_scores)
@@ -115,6 +118,10 @@ def main():
 	print("Train size: {} Dev size: {}, # dimensions: {}".format(
 		len(train_x), len(dev_x), max([len(x) for x in train_x])))
 	train_y, dev_y = train_scores, dev_scores
+	if args.classify:
+		threshold = 1.0
+		train_y = np.array([1.0 if x >= threshold else 0.0 for x in train_scores])
+		dev_y = np.array([1.0 if x >= threshold else 0.0 for x in dev_scores])
 
 	print("Training")
 	if args.model == "nn":
