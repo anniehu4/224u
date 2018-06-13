@@ -68,7 +68,10 @@ def main():
 	if args.model == "nn":
 		print("Using collate function: {}".format(args.collate_fn))
 	for train_answer in train_answers:
+		print(train_answer)
 		features = process(train_answer, args.remove_numbers, args.use_spellcheck)
+		print(features)
+		print("============")
 		# RNN should have data as timeseries
 		if args.model == "rnn":
 			# with embeddings, each timestep is a glove vector of shape=(args.glove_dim, 1)
