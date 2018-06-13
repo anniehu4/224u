@@ -32,7 +32,7 @@ arg_parser.add_argument('--classify', action='store_true', default=False,
                         help='classification problem if True, regression otherwise')
 arg_parser.add_argument('--use-spellcheck', action='store_true', default=False,
                         help='in preproc, spellcheck all words if true')
-arg_parser.add_argument('--normalize-scores', action='store_true', default=True,
+arg_parser.add_argument('--normalize-scores', action='store_true', default=False,
                         help='True to predict normalized scores (min 0, max 1)')
 arg_parser.add_argument('--glove-dim', type=int, default=200,
 						help='dimension for GloVe embeddings')
@@ -72,7 +72,7 @@ def main():
 	if args.model == "nn":
 		print("Using collate function: {}".format(args.collate_fn))
 	for train_answer in train_answers:
-		features = process(train_answer, args.remove_numbers, args.use_spellcheck)
+		features = process(train_answer, glove_lookup, args.remove_numbers, args.use_spellcheck)
 		# RNN should have data as timeseries
 		if args.model == "rnn":
 			# with embeddings, each timestep is a glove vector of shape=(args.glove_dim, 1)
@@ -89,7 +89,7 @@ def main():
 			train_x.append(features)
 
 	for dev_answer in dev_answers:
-		features = process(dev_answer, args.remove_numbers, args.use_spellcheck)
+		features = process(dev_answer, glove_lookup, args.remove_numbers, args.use_spellcheck)
 		# RNN should have data as timeseries
 		if args.model == "rnn":
 			# with embeddings, each timestep is a glove vector of shape=(args.glove_dim, 1)
