@@ -16,13 +16,13 @@ class Vocabulary(object):
         self.idx = 0
 
     def add_word(self, word):
-        if not word in self.word2idx:
+        if word not in self.word2idx:
             self.word2idx[word] = self.idx
             self.idx2word[self.idx] = word
             self.idx += 1
 
     def __call__(self, word):
-        if not word in self.word2idx:
+        if word not in self.word2idx:
             return self.word2idx['<unk>']
         return self.word2idx[word]
 
@@ -41,6 +41,7 @@ def build_vocab(pkl, threshold=0):
     # If the word frequency is less than 'threshold', then the word is discarded.
     words = [word for word, cnt in counter.items() if cnt >= threshold]
 
+
     # Create a vocab wrapper and add some special tokens.
     vocab = Vocabulary()
     vocab.add_word('<pad>')
@@ -49,7 +50,7 @@ def build_vocab(pkl, threshold=0):
     # Add the words to the vocabulary.
     for i, word in enumerate(words):
         vocab.add_word(word)
-    print(vocab.word2idx)
+    #print(vocab.word2idx)
     return vocab
 
 def main():
