@@ -32,7 +32,7 @@ arg_parser.add_argument('--classify', action='store_true', default=False,
                         help='classification problem if True, regression otherwise')
 arg_parser.add_argument('--use-spellcheck', action='store_true', default=False,
                         help='in preproc, spellcheck all words if true')
-arg_parser.add_argument('--normalize-scores', action='store_true', default=False,
+arg_parser.add_argument('--normalize-scores', action='store_true', default=True,
                         help='True to predict normalized scores (min 0, max 1)')
 arg_parser.add_argument('--glove-dim', type=int, default=200,
 						help='dimension for GloVe embeddings')
