@@ -40,9 +40,10 @@ arg_parser.add_argument('--glove-dim', type=int, default=200,
 						help='dimension for GloVe embeddings')
 args = arg_parser.parse_args()
 
-holdout = True 
-TRAIN_FILE = 'data/%strain.pkl' % 'holdout-' if holdout else ''
-DEV_FILE = 'data/%sdev.pkl' % 'holdout-' if holdout else ''
+holdout = True
+direc = 'data/' 
+TRAIN_FILE = direc + '%strain.pkl' % ('holdout-' if holdout else '')
+DEV_FILE = direc + '%sdev.pkl' % ('holdout-' if holdout else '')
 
 
 def main():
