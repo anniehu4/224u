@@ -37,8 +37,8 @@ def strip_starter_code(answers):
         stripped_answers.append(answer)
     return stripped_answers
 
-def prepare_data(data, use_normalized, strip_starter_code=True):
-    if strip_starter_code:
+def prepare_data(data, use_normalized, strip_starter=True):
+    if strip_starter:
         answers = strip_starter_code(data)
     else:
         answers = [d['answer'] for d in data]
