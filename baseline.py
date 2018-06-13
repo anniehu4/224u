@@ -28,6 +28,8 @@ arg_parser.add_argument('--collate-fn', type=str, default="sum",
                         help='avg or sum, used for nn model only')
 arg_parser.add_argument('--remove-numbers', action='store_true', default=False,
                         help='in preproc, replace numbers if true')
+arg_parser.add_argument('--classify', action='store_true', default=False,
+                        help='classification problem if True, regression otherwise')
 arg_parser.add_argument('--use-spellcheck', action='store_true', default=False,
                         help='in preproc, spellcheck all words if true')
 arg_parser.add_argument('--normalize-scores', action='store_true', default=True,
@@ -46,6 +48,9 @@ def main():
 	train_data = pickle.load(open(TRAIN_FILE, 'rb'))
 	dev_data = pickle.load(open(DEV_FILE, 'rb'))
 	vocab = pickle.load(open('data/vocab.pkl', 'rb'))
+
+	if args.classify:
+		args.normalize_scores = True
 
 	# answers is list of strings, scores is numpy array of shape (len,)
 	train_answers, train_scores = prepare_data(train_data, args.normalize_scores)
@@ -117,11 +122,15 @@ def main():
 	print("Train size: {} Dev size: {}, # dimensions: {}".format(
 		len(train_x), len(dev_x), max([len(x) for x in train_x])))
 	train_y, dev_y = train_scores, dev_scores
+	if args.classify:
+		threshold = 1.0
+		train_y = np.array([1.0 if x >= threshold else 0.0 for x in train_scores])
+		dev_y = np.array([1.0 if x >= threshold else 0.0 for x in dev_scores])
 
 	print("Training")
 	if args.model == "nn":
 
-		train_true, train_pred, dev_true, dev_pred = basic_nn(np.array(train_x), train_y.reshape(-1, 1), np.array(dev_x), dev_y.reshape(-1, 1))
+		train_true, train_pred, dev_true, dev_pred = basic_nn(np.array(train_x), train_y.reshape(-1, 1), np.array(dev_x), dev_y.reshape(-1, 1), args.classify)
 	elif args.model == "rnn":
 		train_true, train_pred, dev_true, dev_pred = rnn(train_x, train_y, dev_x, dev_y)
 	else:

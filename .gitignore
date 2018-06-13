@@ -1,6 +1,5 @@
 *.pkl
 vsmdata/*
-*.ipynb
 *.pyc
 .DS_Store
 __pycache__/*
