@@ -33,12 +33,13 @@ def strip_starter_code(answers):
             for line in content:
                 if line in answer:
                     answer.remove(line)
+            answer = '\n'.join(answer)
 
         stripped_answers.append(answer)
     return stripped_answers
 
-def prepare_data(data, use_normalized, strip_starter=True):
-    if strip_starter:
+def prepare_data(data, use_normalized, should_strip=True):
+    if should_strip:
         answers = strip_starter_code(data)
     else:
         answers = [d['answer'] for d in data]

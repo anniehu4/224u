@@ -28,7 +28,7 @@ arg_parser.add_argument('--collate-fn', type=str, default="sum",
                         help='avg or sum, used for nn model only')
 arg_parser.add_argument('--remove-numbers', action='store_true', default=False,
                         help='in preproc, replace numbers if true')
-arg_parser.add_argument('--strip-starter', action='store_true', default=True,
+arg_parser.add_argument('--strip-starter', action='store_true', default=False,
                         help='in prepare data, strip starter code if true')
 arg_parser.add_argument('--classify', action='store_true', default=False,
                         help='classification problem if True, regression otherwise')
