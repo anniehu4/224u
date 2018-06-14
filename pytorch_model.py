@@ -181,7 +181,7 @@ def get_criterion(classify):
     return criterion
     
 
-def basic_nn(x_train, y_train, x_test, y_test, classify=False):
+def basic_nn(x_train, y_train, x_test, y_test, pretrained=False, classify=False):
     # Training settings
     use_cuda = not NO_CUDA and torch.cuda.is_available()
 
@@ -203,9 +203,18 @@ def basic_nn(x_train, y_train, x_test, y_test, classify=False):
 
     n_features = x_train.shape[1]
 
+    path = 'model/nn-classify.ckpt' if classify else 'model/nn-reg.ckpt'
     model = Net(n_features, classify).to(device)
     optimizer = get_optimizer(optimizer_type, model)
     criterion = get_criterion(classify)
+
+    if pretrained:
+        print("=> loading model checkpoint")
+        model.load_state_dict(torch.load(path))
+        test_true, test_pred, metric, embeds = test(model, device, test_loader, criterion, classify)
+        if classify:
+            pickle.dump((test_true, test_pred, embeds), open('data/learned_embeds.pkl', 'wb'))
+        return ([], [], test_true, test_pred)
 
     best_metric = float("-inf")
     best_epoch = 0
@@ -225,7 +234,9 @@ def basic_nn(x_train, y_train, x_test, y_test, classify=False):
             best_test_pred = test_pred
             best_train_true = train_true
             best_train_pred = train_pred
-            pickle.dump((test_true, test_pred, embeds), open('data/learned_embeds.pkl', 'wb'))
+            torch.save(model.state_dict(), path)
+            if classify:
+                pickle.dump((test_true, test_pred, embeds), open('data/nn-learned_embeds.pkl', 'wb'))
 
     print("===================")
     if classify:
@@ -235,7 +246,7 @@ def basic_nn(x_train, y_train, x_test, y_test, classify=False):
     return (train_true, train_pred, test_true, test_pred)
 
 
-def rnn(x_train, y_train, x_test, y_test):
+def rnn(x_train, y_train, x_test, y_test, pretrained=False, classify=False):
     print("x_train", len(x_train))
     print("y_train", y_train.shape)
     print("x_test", len(x_test))
@@ -261,9 +272,18 @@ def rnn(x_train, y_train, x_test, y_test):
     embed_size = 200
     hidden_size = 100
 
+    path = 'model/rnn-classify.ckpt' if classify else 'model/rnn-reg.ckpt'
     model = RNN(embed_size, hidden_size, 2).to(device)
 
     optimizer = get_optimizer(optimizer_type, model)
+
+    if pretrained:
+        print("=> loading model checkpoint")
+        model.load_state_dict(torch.load(path))
+        test_true, test_pred, metric, embeds = test(model, device, test_loader, criterion, classify)
+        if classify:
+            pickle.dump((test_true, test_pred, embeds), open('data/rnn-learned_embeds.pkl', 'wb'))
+        return ([], [], test_true, test_pred)
 
     best_metric = float("-inf")
     best_epoch = 0
@@ -282,6 +302,9 @@ def rnn(x_train, y_train, x_test, y_test):
             best_test_pred = test_pred
             best_train_true = train_true
             best_train_pred = train_pred
+            torch.save(model.state_dict(), path)
+            if classify:
+                pickle.dump((test_true, test_pred, embeds), open('data/nn-learned_embeds.pkl', 'wb'))
 
     print("===================")
     if classify:
