@@ -97,10 +97,10 @@ def train(model, device, train_loader, optimizer, criterion, epoch, classify):
     if classify:
         y_true = np.array(y_true)
         y_pred = np.array([1.0 if pred > 0.5 else 0.0 for pred in y_pred])
-        precision, recall, f1, _ = metrics.precision_recall_fscore_support(y_true, y_pred)
-
-        print('Train Epoch: {} Train acc: {}'.format(
-                epoch, 100. * np.mean(y_true == y_pred)))
+        precision, recall, f1, _ = metrics.precision_recall_fscore_support(y_true, y_pred, average='binary')
+        
+        print('Train Epoch: {} Train f1: {}'.format(
+                epoch, f1))
 
     else:
         epoch_r2 = metrics.r2_score(y_true, y_pred)
@@ -157,8 +157,9 @@ def test(model, device, test_loader, criterion, classify):
         y_true = np.array(y_true)
         y_pred = np.array([1.0 if pred > 0.5 else 0.0 for pred in y_pred])
         acc = 100. * np.mean(y_true == y_pred)
-        metric = acc
-        print('Test loss: {} Test acc: {}'.format(test_loss, acc))
+        precision, recall, f1, _ = metrics.precision_recall_fscore_support(y_true, y_pred, average='binary')
+        metric = f1
+        print('Test loss: {} Test f1: {}'.format(test_loss, f1))
     else:
         epoch_r2 = metrics.r2_score(y_true, y_pred)
         metric = epoch_r2
@@ -243,7 +244,7 @@ def basic_nn(x_train, y_train, x_test, y_test, pretrained=False, classify=False)
         print('\nBest Test acc: {} on epoch: {})\n'.format(best_metric, best_epoch))
     else:
         print('\nBest Test r2: {} on epoch: {})\n'.format(best_metric, best_epoch))
-    return (train_true, train_pred, test_true, test_pred)
+    return (train_true, train_pred, test_true, test_pred, best_metric)
 
 
 def rnn(x_train, y_train, x_test, y_test, pretrained=False, classify=False):
@@ -311,4 +312,4 @@ def rnn(x_train, y_train, x_test, y_test, pretrained=False, classify=False):
         print('\nBest Test acc: {} on epoch: {})\n'.format(best_metric, best_epoch))
     else:
         print('\nBest Test r2: {} on epoch: {})\n'.format(best_metric, best_epoch))
-    return (train_true, train_pred, test_true, test_pred)
+    return (train_true, train_pred, test_true, test_pred, best_metric)

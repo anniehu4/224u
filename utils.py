@@ -8,6 +8,8 @@ import keyword
 from sklearn.metrics import f1_score
 from spellchecker import SpellChecker
 
+keywords = keyword.kwlist + ['println', 'private', 'void', 'string', 'int', 'boolean']
+
 def strip_starter_code(answers):
     stripped_answers = []
     STARTER_DATA_DIR = 'finalWin18'
@@ -66,21 +68,23 @@ def camel_case_process(s):
     return joined
 
 
-def spellcheck(s):
-    spell = SpellChecker()
+def spellcheck(s, lookup):
+    # spell = SpellChecker()
     count = 0
     words = s.split()
     correct_words = []
+    wrong_words = []
     for w in words:
-        if (not w.isalpha()) or keyword.iskeyword(w):
+        if (not w.isalpha()) or w in keywords:
             correct_words.append(w)
         elif w not in lookup:
-            correct_words.append(spell.correction(w))
+            # correct_words.append(spell.correction(w))
+            wrong_words.append(w)
             count += 1
         else:
             correct_words.append(w)
     # print(" ".join(correct_words))
-    print(count, "words changed")
+
     return " ".join(correct_words)
 
 def process(s, lookup, remove_numbers=False, use_spellcheck=False):
@@ -105,10 +109,10 @@ def process(s, lookup, remove_numbers=False, use_spellcheck=False):
     s = s.replace('_', ' ')
     # remove extraneous whitespace
     s = re.sub(' +', ' ', s)
-    s = camel_case_process(s)
+    s = camel_case_process(s).lower()
     if use_spellcheck:
         s = spellcheck(s, lookup)
-    return s.lower()
+    return s
 
 def embed(s, lookup, dim=50, bow=True, collate_fn=None):
     """
@@ -142,7 +146,7 @@ def filter_keywords(s):
     count_keywords = 0 # just to sanity check
     # java_words = 
     for x in s.split(' '):
-        if keyword.iskeyword(x):
+        if x in keywords:
             keywords.append(x)
             count_keywords += 1
         else:
