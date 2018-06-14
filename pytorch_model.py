@@ -203,7 +203,7 @@ def basic_nn(x_train, y_train, x_test, y_test, pretrained=False, classify=False)
 
     n_features = x_train.shape[1]
 
-    path = 'model/nn-classify.ckpt' if classify else 'model/nn-reg.ckpt'
+    path = 'model/nn-classify.model' if classify else 'model/nn-reg.model'
     model = Net(n_features, classify).to(device)
     optimizer = get_optimizer(optimizer_type, model)
     criterion = get_criterion(classify)
@@ -272,7 +272,7 @@ def rnn(x_train, y_train, x_test, y_test, pretrained=False, classify=False):
     embed_size = 200
     hidden_size = 100
 
-    path = 'model/rnn-classify.ckpt' if classify else 'model/rnn-reg.ckpt'
+    path = 'model/rnn-classify.model' if classify else 'model/rnn-reg.model'
     model = RNN(embed_size, hidden_size, 2).to(device)
 
     optimizer = get_optimizer(optimizer_type, model)

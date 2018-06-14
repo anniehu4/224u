@@ -38,18 +38,24 @@ arg_parser.add_argument('--normalize-scores', action='store_true', default=True,
                         help='True to predict normalized scores (min 0, max 1)')
 arg_parser.add_argument('--glove-dim', type=int, default=200,
 						help='dimension for GloVe embeddings')
+arg_parser.add_argument('--pretrained', action='store_true', default=False,
+                        help='True to use pretrained model checkpoint')
 args = arg_parser.parse_args()
 
 holdout = True
 direc = 'data/' 
 TRAIN_FILE = direc + '%strain.pkl' % ('holdout-' if holdout else '')
 DEV_FILE = direc + '%sdev.pkl' % ('holdout-' if holdout else '')
+TEST_FILE = direc + '%stest.pkl' % ('holdout-' if holdout else '')
 
 
 def main():
 	print("Loading training data...")
 	train_data = pickle.load(open(TRAIN_FILE, 'rb'))
-	dev_data = pickle.load(open(DEV_FILE, 'rb'))
+	if args.pretrained:
+		dev_data = pickle.load(open(TEST_FILE, 'rb'))
+	else:
+		dev_data = pickle.load(open(DEV_FILE, 'rb'))
 	vocab = pickle.load(open('data/vocab.pkl', 'rb'))
 
 	if args.classify:
@@ -133,9 +139,10 @@ def main():
 	print("Training")
 	if args.model == "nn":
 
-		train_true, train_pred, dev_true, dev_pred = basic_nn(np.array(train_x), train_y.reshape(-1, 1), np.array(dev_x), dev_y.reshape(-1, 1), args.classify)
+		train_true, train_pred, dev_true, dev_pred = basic_nn(np.array(train_x), train_y.reshape(-1, 1),
+			np.array(dev_x), dev_y.reshape(-1, 1), args.pretrained, args.classify)
 	elif args.model == "rnn":
-		train_true, train_pred, dev_true, dev_pred = rnn(train_x, train_y, dev_x, dev_y)
+		train_true, train_pred, dev_true, dev_pred = rnn(train_x, train_y, dev_x, dev_y, args.pretrained, args.classify)
 	else:
 		model = LinearRegression(fit_intercept=False)
 		model.fit(train_x, train_y)
