@@ -140,6 +140,7 @@ def filter_keywords(s):
     words = []
     keywords = []
     count_keywords = 0 # just to sanity check
+    # java_words = 
     for x in s.split(' '):
         if keyword.iskeyword(x):
             keywords.append(x)
