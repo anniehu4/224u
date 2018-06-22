@@ -18,7 +18,6 @@ class BowDataset(Dataset):
         return len(self.x)
 
     def __getitem__(self, idx):
-        #sample = {'x': self.x[idx], 'y': self.y[idx]}
         sample = (torch.tensor(self.x[idx]), torch.tensor(self.y[idx]))
         return sample
 
@@ -28,7 +27,7 @@ def collate_fn(data):
     We should build custom collate_fn rather than using default collate_fn,
     because padding is not supported in default.
     Args:
-        data: list of tuple (image, caption).
+        data: list of tuple (answer, score).
             - answer: torch tensor of shape (?); variable length
             - score: torch tensor of shape (1,)
     Returns:

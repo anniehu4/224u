@@ -13,28 +13,6 @@ from torchvision import datasets, transforms
 from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence
 from sklearn import metrics
 from data_loader import *
-from utils import pad
-
-"""
-parser = argparse.ArgumentParser()
-parser.add_argument('--batch-size', type=int, default=64, metavar='N',
-                    help='input batch size for training (default: 64)')
-parser.add_argument('--test-batch-size', type=int, default=10, metavar='N',
-                    help='input batch size for testing (default: 1)')
-parser.add_argument('--epochs', type=int, default=30, metavar='N',
-                    help='number of epochs to train (default: 30)')
-parser.add_argument('--lr', type=float, default=0.001, metavar='LR',
-                    help='learning rate (default: 0.001)')
-parser.add_argument('--momentum', type=float, default=0.5, metavar='M',
-                    help='SGD momentum (default: 0.5)')
-parser.add_argument('--no-cuda', action='store_true', default=False,
-                    help='disables CUDA training')
-parser.add_argument('--seed', type=int, default=1, metavar='S',
-                    help='random seed (default: 1)')
-parser.add_argument('--log-interval', type=int, default=50, metavar='N',
-                    help='how many batches to wait before logging training status')
-args = parser.parse_args()
-"""
 
 BATCH_SIZE = 64
 TEST_BATCH_SIZE = 10
@@ -46,19 +24,18 @@ SEED = 1
 LOG_INTERVAL = 50
 
 
-def train_rnn(model, device, train_loader, optimizer, epoch):
+def train_rnn(model, device, train_loader, optimizer, criterion, epoch, classify):
     model.train()
     y_true = []
     y_pred = []
     for batch_idx, (data, target, lengths) in enumerate(train_loader):
         data, target = data.to(device).float(), target.to(device).float()
-        y_true += target.numpy().tolist()
+        y_true += np.reshape(target.numpy(), -1).tolist()
 
-        output = model(data, lengths)
-        y_pred += output.cpu().detach().numpy().tolist()
+        output, embed = model(data, lengths)
+        y_pred += np.reshape(output.cpu().detach().numpy(), -1).tolist()
 
-        mse = nn.MSELoss()
-        loss = mse(output, target)
+        loss = criterion(output, target)
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
@@ -67,8 +44,17 @@ def train_rnn(model, device, train_loader, optimizer, epoch):
                 epoch, batch_idx * len(data), len(train_loader.dataset),
                 100. * batch_idx / len(train_loader), loss.item()))
 
-    epoch_r2 = metrics.r2_score(y_true, y_pred)
-    print('Train Epoch: {} Train r2: {}'.format(
+    if classify:
+        y_true = np.array(y_true)
+        y_pred = np.array([1.0 if pred > 0.5 else 0.0 for pred in y_pred])
+        precision, recall, f1, _ = metrics.precision_recall_fscore_support(y_true, y_pred, average='binary')
+        
+        print('Train Epoch: {} Train f1: {}'.format(
+                epoch, f1))
+
+    else:
+        epoch_r2 = metrics.r2_score(y_true, y_pred)
+        print('Train Epoch: {} Train r2: {}'.format(
                 epoch, epoch_r2))
     return y_true, y_pred
 
@@ -83,8 +69,7 @@ def train(model, device, train_loader, optimizer, criterion, epoch, classify):
         output, embed = model(data, None)
         y_pred += np.reshape(output.cpu().detach().numpy(), -1).tolist()
 
-        mse = nn.MSELoss()
-        loss = mse(output, target)
+        loss = criterion(output, target)
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
@@ -109,29 +94,37 @@ def train(model, device, train_loader, optimizer, criterion, epoch, classify):
 
     return y_true, y_pred
 
-def test_rnn(model, device, test_loader):
+def test_rnn(model, device, test_loader, criterion, classify):
     model.eval()
     y_true = []
     y_pred = []
+    embeds = []
     test_loss = 0
     with torch.no_grad():
         for data, target, lengths in test_loader:
             data, target = data.to(device).float(), target.to(device).float()
             y_true += np.reshape(target.numpy(), -1).tolist()
-            output = model(data, lengths)
+            output, embed = model(data, lengths)
+            embeds += embed.cpu().detach().numpy().tolist()
             y_pred += np.reshape(output.cpu().detach().numpy(), -1).tolist()
 
-            mse = nn.MSELoss()
-            loss = mse(output, target)
-            #test_loss += F.nll_loss(output, target, size_average=False).item() # sum up batch loss
+            loss = criterion(output, target)
             test_loss += loss
 
 
     test_loss /= len(test_loader)
-    epoch_r2 = metrics.r2_score(y_true, y_pred)
-    print('\nTest set: Average loss: {:.4f}, Test r2: {})\n'.format(
-        test_loss, epoch_r2))
-    return y_true, y_pred
+    if classify:
+        y_true = np.array(y_true)
+        y_pred = np.array([1.0 if pred > 0.5 else 0.0 for pred in y_pred])
+        acc = 100. * np.mean(y_true == y_pred)
+        precision, recall, f1, _ = metrics.precision_recall_fscore_support(y_true, y_pred, average='binary')
+        metric = f1
+        print('Test loss: {} Test f1: {}'.format(test_loss, f1))
+    else:
+        epoch_r2 = metrics.r2_score(y_true, y_pred)
+        metric = epoch_r2
+        print('Test loss: {} Test r2: {}'.format(test_loss, epoch_r2))
+    return y_true, y_pred, metric, embeds
 
 def test(model, device, test_loader, criterion, classify):
     model.eval()
@@ -148,7 +141,6 @@ def test(model, device, test_loader, criterion, classify):
             y_pred += np.reshape(output.cpu().detach().numpy(), -1).tolist()
 
             loss = criterion(output, target)
-            #test_loss += F.nll_loss(output, target, size_average=False).item() # sum up batch loss
             test_loss += loss
 
 
@@ -274,9 +266,11 @@ def rnn(x_train, y_train, x_test, y_test, pretrained=False, classify=False):
     hidden_size = 100
 
     path = 'model/rnn-classify.model' if classify else 'model/rnn-reg.model'
-    model = RNN(embed_size, hidden_size, 2).to(device)
+    print(path)
+    model = RNN(embed_size, hidden_size, 1, classify).to(device)
 
     optimizer = get_optimizer(optimizer_type, model)
+    criterion = get_criterion(classify)
 
     if pretrained:
         print("=> loading model checkpoint")
@@ -294,8 +288,8 @@ def rnn(x_train, y_train, x_test, y_test, pretrained=False, classify=False):
     best_train_pred = []
 
     for epoch in range(1, EPOCHS + 1):
-        train_true, train_pred = train_rnn(model, device, train_loader, optimizer, epoch, False)
-        test_true, test_pred, metric = test_rnn(model, device, test_loader, False)
+        train_true, train_pred = train_rnn(model, device, train_loader, optimizer, criterion, epoch, classify)
+        test_true, test_pred, metric, embeds = test_rnn(model, device, test_loader, criterion, classify)
         if metric > best_metric:
             best_metric = metric
             best_epoch = epoch
@@ -309,7 +303,7 @@ def rnn(x_train, y_train, x_test, y_test, pretrained=False, classify=False):
 
     print("===================")
     if classify:
-        print('\nBest Test acc: {} on epoch: {})\n'.format(best_metric, best_epoch))
+        print('\nBest Test f1: {} on epoch: {})\n'.format(best_metric, best_epoch))
     else:
         print('\nBest Test r2: {} on epoch: {})\n'.format(best_metric, best_epoch))
-    return (train_true, train_pred, test_true, test_pred, best_metric)
+    return (best_train_true, best_train_pred, best_test_true, best_test_pred, best_metric)

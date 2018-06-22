@@ -29,14 +29,15 @@ class Net(nn.Module):
 
 class RNN(nn.Module):
     # input_size = embed_sz
-    def __init__(self, input_size, hidden_size, num_layers):
+    def __init__(self, input_size, hidden_size, num_layers, classify=False):
         super(RNN, self).__init__()
         self.hidden_size = hidden_size
         self.input_size = input_size
         self.num_layers = num_layers
         self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
-        # self.fc1 = nn.Linear()
         self.fc = nn.Linear(hidden_size, 1)
+        self.classify = classify
+        self.classify_fn = nn.Sigmoid()
     
     def forward(self, x, lengths):
         # x.size() = (batch_size, max_seq_len, embed_sz)
@@ -50,8 +51,10 @@ class RNN(nn.Module):
         output, _ = self.lstm(packed, (h0, c0))
         output, _ = pad_packed_sequence(output, batch_first=True)
         #  output size is (batch, seq_len, hidden_size * num_directions)
-        last_hidden = output[np.arange(batch_size), lengths, :]
+        last_hidden = output[np.arange(batch_size), lengths - 1, :]
         # last_hidden size is (batch_size, hidden_size)
         # Decode the hidden state of the last time step
         out = self.fc(last_hidden)
-        return out
+        if self.classify:
+            out = self.classify_fn(out)
+        return out, last_hidden

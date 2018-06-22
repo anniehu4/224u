@@ -9,6 +9,7 @@ from sklearn.metrics import f1_score
 from spellchecker import SpellChecker
 
 keywords = keyword.kwlist + ['println', 'private', 'void', 'string', 'int', 'boolean']
+spell = SpellChecker()
 
 def strip_starter_code(answers):
     stripped_answers = []
@@ -69,7 +70,6 @@ def camel_case_process(s):
 
 
 def spellcheck(s, lookup):
-    # spell = SpellChecker()
     count = 0
     words = s.split()
     correct_words = []
@@ -78,12 +78,11 @@ def spellcheck(s, lookup):
         if (not w.isalpha()) or w in keywords:
             correct_words.append(w)
         elif w not in lookup:
-            # correct_words.append(spell.correction(w))
-            wrong_words.append(w)
+            correct_words.append(spell.correction(w))
+            # wrong_words.append(w)
             count += 1
         else:
             correct_words.append(w)
-    # print(" ".join(correct_words))
 
     return " ".join(correct_words)
 
@@ -114,7 +113,7 @@ def process(s, lookup, remove_numbers=False, use_spellcheck=False):
         s = spellcheck(s, lookup)
     return s
 
-def embed(s, lookup, dim=50, bow=True, collate_fn=None):
+def embed(s, lookup, bow=True, collate_fn=None):
     """
     Parameters:
      - s: String of processed text with each word separated by a space.
@@ -131,10 +130,8 @@ def embed(s, lookup, dim=50, bow=True, collate_fn=None):
 
     if collate_fn == "sum":
         tokens = np.sum(tokens, axis=0) #keep_dims=True
-        # sum GloVe vectors
     elif collate_fn == "avg":
         tokens = np.average(tokens, axis=0) #keep_dims=True
-        # sum GloVe vectors
 
     return tokens
 
@@ -144,7 +141,6 @@ def filter_keywords(s):
     words = []
     keywords = []
     count_keywords = 0 # just to sanity check
-    # java_words = 
     for x in s.split(' '):
         if x in keywords:
             keywords.append(x)
@@ -152,18 +148,6 @@ def filter_keywords(s):
         else:
             words.append(x)
     return ' '.join(words)
-
-def pad(features, max_len, dim=50):
-    for i, row in enumerate(features):
-        pad_size = max_len - len(row)
-        if pad_size < 0:
-            features[i] = row[:max_len, :].flatten()
-        elif pad_size == max_len: #strange edge case, will debug later
-            features[i] = np.zeros(max_len * dim)
-        else:
-            padded = np.pad(row, ((0, pad_size), (0, 0)), 'constant')
-            features[i] = padded.flatten()
-    return np.array(features)
 
 """Code after this point taken from CS224U course examples"""
 

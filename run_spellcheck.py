@@ -11,7 +11,7 @@ glove_lookup = glove2dict(os.path.join(glove_home, 'glove.6B.50d.txt'))
 print(" - done.")
 
 for item in data:
-	answer = spellcheck(item['answer'], glove_lookup)
+	answer = process(item['answer'], glove_lookup, use_spellcheck=True)
 	new_data.append({
 			'question': item['question'],
 			'answer': answer,
@@ -22,4 +22,4 @@ for item in data:
 		})
 
 print(len(data), len(new_data))
-pickle.dump(new_data, open('data/data_spellchecked.pkl', 'wb'))
+pickle.dump(new_data, open('processed/data.pkl', 'wb'))

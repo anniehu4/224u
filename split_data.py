@@ -2,8 +2,6 @@ import pickle
 import os
 import random
 
-
-#data = pickle.load(open('data.pkl', 'rb'), encoding='latin1')
 direc = 'processed/'
 path_dataset = 'processed/data.pkl'
 msg = "{} file not found. Make sure you have downloaded the right dataset".format(path_dataset)
@@ -13,7 +11,7 @@ data = pickle.load(open(path_dataset, 'rb'))
 print("Parsed {} student answers.".format(len(data)))
 print("- done.")
 
-holdout = True
+holdout = False
 
 def holdout_split(dev_prob, test_prob):
 	dev_holdout = dev_prob + '-cs106aFinalWin18'
@@ -29,7 +27,9 @@ def holdout_split(dev_prob, test_prob):
 		else:
 			train_dataset.append(x)
 	print("Train size: {} Dev size: {} Test size: {}".format(len(train_dataset), len(dev_dataset), len(test_dataset)))
+	# comment following line if not running holdout tests on all problems
 	return train_dataset, dev_dataset, test_dataset
+
 	pickle.dump(train_dataset, open(direc + 'holdout-train.pkl', 'wb'))
 	pickle.dump(dev_dataset, open(direc + 'holdout-dev.pkl', 'wb'))
 	pickle.dump(test_dataset, open(direc + 'holdout-test.pkl', 'wb'))
@@ -38,7 +38,7 @@ def holdout_split(dev_prob, test_prob):
 
 def main():
 	if holdout:
-		holdout_split('6', '6')
+		holdout_split('3a', '3a')
 		return
 
 	random.seed(1)
